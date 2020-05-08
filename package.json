@@ -1,0 +1,82 @@
+{
+  "name": "v-sky",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve --mode local",
+    "build": "vue-cli-service build --mode local",
+    "serve-dev": "vue-cli-service serve --mode development",
+    "build-dev": "vue-cli-service build --mode development",
+    "lint": "vue-cli-service lint"
+  },
+  "dependencies": {
+    "core-js": "^3.6.4",
+    "vue": "^2.6.11",
+    "vue-router": "^3.1.6",
+    "vuetify": "^2.2.27",
+    "vuex": "^3.3.0"
+  },
+  "devDependencies": {
+    "@nuxtjs/vuetify": "^1.11.2",
+    "@vue/cli-plugin-babel": "~4.3.0",
+    "@vue/cli-plugin-eslint": "~4.3.0",
+    "@vue/cli-plugin-router": "~4.3.0",
+    "@vue/cli-plugin-vuex": "~4.3.0",
+    "@vue/cli-service": "~4.3.0",
+    "babel-eslint": "^10.1.0",
+    "deepmerge": "^4.2.2",
+    "eslint": "^6.7.2",
+    "eslint-plugin-vue": "^6.2.2",
+    "fibers": "^4.0.3",
+    "sass": "^1.26.5",
+    "sass-loader": "^8.0.2",
+    "vue-cli-plugin-vuetify": "~2.0.5",
+    "vue-template-compiler": "^2.6.11",
+    "vuetify-loader": "^1.3.0"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "parserOptions": {
+      "parser": "babel-eslint"
+    },
+    "rules": {
+      "camelcase": "off",
+      "comma-dangle": "off",
+      "comma-spacing": "off",
+      "eqeqeq": "off",
+      "handle-callback-err": "off",
+      "indent": "off",
+      "key-spacing": "off",
+      "keyword-spacing": "off",
+      "no-multi-spaces": "off",
+      "no-undef": "off",
+      "no-unused-vars": "off",
+      "object-curly-spacing": "off",
+      "quotes": "off",
+      "semi": "off",
+      "space-before-function-paren": "off",
+      "space-before-blocks": "off",
+      "space-in-parens": "off",
+      "spaced-comment": "off",
+      "space-infix-ops": "off",
+      "no-dupe-keys": "off",
+      "no-fallthrough": "off",
+      "no-spaced-func": "off",
+      "no-multiple-empty-lines": "off",
+      "no-trailing-spaces": "off",
+      "padded-blocks": "off"
+    }
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
