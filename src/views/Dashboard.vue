@@ -1,23 +1,25 @@
 <template>
-  <v-container>
+  <v-container fluid>
+
+    <v-row justify="center">
+      <MyInfo :mydata="mydata" :shrink="in_room" /> <!-- Vuex使っているので状態管理に注意（疎結合でないためそのうち修正します） -->
+    </v-row>
 
     <v-row justify="center">
 
+      <!-- ルームに入っていないとき：一覧表示 -->
       <v-col v-if="!in_room" cols="12" sm="8">
         <RoomList :rooms="rooms" :peers="peers" />
       </v-col>
 
-      <v-col v-else cols="12" sm="8">
-        <RoomView :mydata="mydata" :rooms="rooms" :streams="remote_streams" :peers="peers" />
+      <!-- ルームに入っているとき：ルーム内表示 -->
+      <v-col v-else cols="12">
+        <RoomView :mydata="mydata" :rooms="rooms" :streams="room_streams" :peers="peers" />
       </v-col>
 
-
-      <v-col cols="12" sm="4">
-
-        <MyCard :mydata="mydata" /> <!-- Vuex使っているので状態管理に注意 -->
-
+      <!-- ルームに入っていないとき：ピア一覧を表示 -->
+      <v-col v-if="!in_room" cols="12" sm="4">
         <UserList :peers="peers" />
-
       </v-col>
 
     </v-row>
@@ -30,24 +32,24 @@
 <script>
 import RoomList from '@/components/RoomList.vue'
 import RoomView from '@/components/RoomView.vue'
-import MyCard   from '@/components/MyCard.vue'
+import MyInfo   from '@/components/MyInfo.vue'
 import UserList from '@/components/UserList.vue'
 
 export default {
   components: {
     RoomList,
     RoomView,
-    MyCard,
+    MyInfo,
     UserList,
   },
 
   data() {
     return {
-      develop_mode: (process.env.NODE_ENV == 'local' || process.env.NODE_ENV == 'development'),
+      develop_mode: (process.env.NODE_ENV == 'development'),
       // メディア
       skyway_apikey: process.env.VUE_APP_SKYWAY_APIKEY,
       my_id: '',
-      remote_streams: {},
+      room_streams: {},
       // ユーザー状態
       in_room: false,
       // 自分の基本データ（P2P送信にも利用する）
@@ -104,6 +106,8 @@ export default {
       this.$store.commit('setUserStatus', 'オンライン - ' + this.my_id);
       // 接続通知を送信
       this.sayHello();
+      // ピアリストに自身を登録
+      this.upsertPeers(this.my_id, this.mydata.display_name, this.mydata.icon_url, this.mydata.joined_room_name, this.mydata.joined_room_type);
     });
 
     // シグナリングサーバ切断
@@ -197,6 +201,8 @@ export default {
       this.$store.state.skyway.room = this.$store.state.skyway.peer.joinRoom(room_name, {
         mode: room_type,
         stream: this.$store.state.local_media_stream,
+        videoReceiveEnabled: true,
+        audioReceiveEnabled: true,
       });
       // ルーム入室
       this.$store.state.skyway.room.on('open', () => {
@@ -204,17 +210,19 @@ export default {
         this.mydata.joined_room_type = room_type;
         // 画面切替
         this.in_room = true;
+        // ルーム内ストリームのリストに自身を追加（空ストリームでもよい）
+        this.$set(this.room_streams, this.my_id, this.$store.state.local_media_stream);
         this.dumpLog('ルーム"'+room_name+'"（'+room_type+'）に入室しました @ Peer.joinRoom.on(\'open\')');
         // 変更をブロードキャストによって通知
         this.broadcast();
       });
       // 誰かからのストリームを受信したらデータ内の配列に追加する
       this.$store.state.skyway.room.on('stream', mediaStream => {
-        this.$set(this.remote_streams, mediaStream.peerId, mediaStream);
+        this.$set(this.room_streams, mediaStream.peerId, mediaStream);
       });
       // 誰かが退室したらデータからも削除
       this.$store.state.skyway.room.on('peerLeave', peerId => {
-        this.$delete(this.remote_streams, peerId);
+        this.$delete(this.room_streams, peerId);
       });
     },
 
@@ -226,16 +234,16 @@ export default {
         // 上は仮に機能していたとしても以下のon.closeはどうしても発生しない・要問合せ
         this.skyway_room.on('close', () => {
           this.skyway_room = '';
-          Object.keys(this.remote_streams).forEach(peer_id => this.$delete(this.remote_streams, peer_id));
+          Object.keys(this.room_streams).forEach(peer_id => this.$delete(this.room_streams, peer_id));
           this.dumpLog('ルームから退室しました');
         });
         */
         await this.$store.state.skyway.room.close();
-        this.$store.state.skyway.room = '';
-        Object.keys(this.remote_streams).forEach(peer_id => this.$delete(this.remote_streams, peer_id));
+        Object.keys(this.room_streams).forEach(peer_id => this.$delete(this.room_streams, peer_id));
         this.mydata.joined_room_name = '';
         this.mydata.joined_room_type = '';
         this.dumpLog('ルーム"'+this.$store.state.skyway.room.name+'"から退室しました @ after Room.close()');
+        this.$store.state.skyway.room = '';
       } else {
         this.dumpLog('いずれのルームにも入室していないため退室できません');
       }
@@ -269,12 +277,6 @@ export default {
     icon_url() { return this.$store.state.user_info.icon_url },
     joined_room() { return this.$store.state.user_info.room }, // Vuexにあるルーム名は末尾注意
     rooms() {
-      // 自分も含めたピアの一覧を作る
-      let allPeers = Object.assign({}, this.peers);
-      allPeers[this.my_id] = {
-        joined_room_name: this.mydata.joined_room_name,
-        joined_room_type: this.mydata.joined_room_type,
-      };
       // 返却値のベース：Mainは空室でも存在させる
       let room_list = {
         Main: {
@@ -283,9 +285,9 @@ export default {
         },
       };
       // ピアごとにルーム名を抽出する
-      Object.keys(allPeers).forEach(peer_id => {
-        const name = allPeers[peer_id].joined_room_name;
-        const type = allPeers[peer_id].joined_room_type;
+      Object.keys(this.peers).forEach(peer_id => {
+        const name = this.peers[peer_id].joined_room_name;
+        const type = this.peers[peer_id].joined_room_type;
         // ルーム名ごとに処理
         if (name == '') {
           // ルーム名が空白ならどこにも入室していないのでスキップ
@@ -316,6 +318,8 @@ export default {
         // 空文字列の場合は退室
         this.dumpLog(oldRoomName+'から退室しています… @ Vue$watch');
         this.leaveRoom();
+        // ピアリスト内の自身を更新
+        this.upsertPeers(this.my_id, this.mydata.display_name, this.mydata.icon_url, '', '');
       } else {
         // それ以外は入室
         // Vuexから受け取るルーム名の末尾2文字でMESH/SFUの判定をする（暫定対応）
@@ -333,17 +337,10 @@ export default {
         // 入室
         this.dumpLog(roomObj.name+'に入室しています… @ Vue$watch');
         this.joinRoom(roomObj.name, roomObj.type);
+        // ピアリスト内の自身を更新
+        this.upsertPeers(this.my_id, this.mydata.display_name, this.mydata.icon_url, roomObj.name, roomObj.type);
       }
     },
   },
 }
 </script>
-
-
-
-<style lang="scss">
-.video-stream {
-  background-color: #A0A0A0;
-  width: 100%;
-}
-</style>

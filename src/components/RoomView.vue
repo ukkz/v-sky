@@ -13,10 +13,10 @@
     <v-item-group>
       <v-container>
         <v-row dense>
-          <v-col v-for="(stream, peer_id, index) in streams" :key="index" :cols="col_width">
+          <v-col v-for="(stream, peer_id, index) in streams" :key="index" :cols="col_width" :sm="sm_width">
             <v-item>
-              <v-card tile>
-                <video class="video-stream" :srcObject.prop="stream" autoplay playsinline></video>
+              <v-responsive class="peer-frame">
+                <video class="video-stream ma-auto" :srcObject.prop="stream" autoplay playsinline></video>
                 <div style="position:absolute;top:16px;left:16px; color:white; text-shadow:1px 1px 3px black;">
                   <v-avatar color="indigo">
                     <v-icon v-if="!peers[peer_id].icon_url" dark>mdi-account-circle</v-icon>
@@ -24,7 +24,7 @@
                   </v-avatar>
                   <span class="px-2">{{ peers[peer_id].display_name }}</span>
                 </div>
-              </v-card>
+              </v-responsive>
             </v-item>
           </v-col>
         </v-row>
@@ -32,6 +32,7 @@
     </v-item-group>
   </v-card>
 </template>
+
 
 <script>
 export default {
@@ -56,7 +57,7 @@ export default {
   },
 
   computed: {
-    col_width() {
+    sm_width() {
       const l = Object.keys(this.streams).length;
       switch (l) {
         case 0:
@@ -80,6 +81,29 @@ export default {
           return 3;
       }
     },
+    col_width() {
+      const l = Object.keys(this.streams).length;
+      switch (l) {
+        case 0:
+        case 1:
+        case 2:
+          return 12;
+        default:
+          return 6;
+      }
+    },
   },
 }
 </script>
+
+
+<style lang="scss">
+.video-stream {
+  background-color: #A0A0A0;
+  width: 100%;
+  height: auto;
+}
+.peer-frame {
+  overflow: hidden;
+}
+</style>
