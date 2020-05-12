@@ -6,16 +6,16 @@
 
         <v-card class="mx-auto mb-2" outlined>
           <v-card-title>ようこそ</v-card-title>
-          <v-card-subtitle>以下のいずれかの方法でログインしてください。</v-card-subtitle>
+          <v-card-subtitle>以下のいずれかの方法でログインしてください。<br>LINE内部ブラウザ・iOS版Chromeブラウザでは利用できません。</v-card-subtitle>
         </v-card>
 
         <v-card class="mx-auto mb-2" outlined>
           <v-card-title>ゲストユーザとしてログイン</v-card-title>
-          <v-card-subtitle>表示したい名前を入力し、ゲストとして参加します。一部の機能が制限されることがあります。</v-card-subtitle>
+          <v-card-subtitle>登録不要で誰でも参加できます。一部の機能は利用できません。</v-card-subtitle>
           <v-card-text>
             <v-form ref="form" v-model="guest_name_valid" @submit.prevent>
-              <v-text-field v-model="guest_name" :counter="15" :rules="guest_name_rules" label="ゲスト名" required></v-text-field>
-              <v-row justify="center"><v-btn color="primary" class="ma-2" @click="loginAsGuest" :disabled="!guest_name_valid">ログイン</v-btn></v-row>
+              <v-text-field v-model="guest_name" :counter="15" :rules="guest_name_rules" label="表示したい名前" required></v-text-field>
+              <v-row justify="center"><v-btn color="primary" class="ma-2" @click="loginAsGuest" :disabled="!guest_name_valid">ゲストログイン</v-btn></v-row>
             </v-form>
           </v-card-text>
         </v-card>
