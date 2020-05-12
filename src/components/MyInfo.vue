@@ -21,10 +21,10 @@
             <h3 class="mx-2">{{ mydata.display_name }} さん</h3>
           </v-row>
           <v-row justify="center" class="my-2">
-            <v-btn outlined small class="ma-1" color="green" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
-            <v-btn outlined small class="ma-1" color="green" @click="audio_muted = !audio_muted"><v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>音声</v-btn>
-            <v-btn outlined small class="ma-1" color="blue"  @click.stop="open = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
-            <v-btn outlined small class="ma-1" color="red"   @click="logout"><v-icon>mdi-logout</v-icon>ログアウト</v-btn>
+            <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
+            <v-btn outlined small class="ma-1" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted"><v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>音声</v-btn>
+            <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="open = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
+            <v-btn outlined small class="ma-1" color="pink darken-1" @click="logout"><v-icon>mdi-logout</v-icon>ログアウト</v-btn>
           </v-row>
         </v-col>
       </v-row>
@@ -51,13 +51,16 @@
         <v-card-text class="mt-2">
           利用したいカメラ・マイクを選択してください。<br>
           使用可否を求めるダイアログが表示された場合は「許可」をクリックしてください。
-          <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" :disabled="video_muted" class="mt-2"></v-select>
-          <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" :disabled="audio_muted" class="mt-n2"></v-select>
-          映像または音声が正常に取得できていれば以下に表示されます。
         </v-card-text>
 
-        <v-row justify="center">
-          <v-col cols="8">
+        <v-row justify="center" dense class="mx-1">
+
+          <v-col cols="6">
+            <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" :disabled="video_muted" class="mt-2"></v-select>
+            <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" :disabled="audio_muted" class="mt-n2"></v-select>
+          </v-col>
+
+          <v-col cols="6">
             <v-responsive>
               <video id="my-video-dialog" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
               <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
@@ -65,11 +68,12 @@
               </div>
             </v-responsive>
           </v-col>
+
         </v-row>
 
-        <v-card-actions>
-          <v-btn text class="ma-1" color="green" @click="video_muted = !video_muted">映像{{ (video_muted ? 'オフ' : 'オン') }}</v-btn>
-          <v-btn text class="ma-1" color="green" @click="audio_muted = !audio_muted">音声{{ (audio_muted ? 'オフ' : 'オン') }}</v-btn>
+        <v-card-actions justify="center">
+          <v-btn outlined class="ma-2" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted">映像:{{ (video_muted ? 'オフ' : 'オン') }}</v-btn>
+          <v-btn outlined class="ma-2" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted">音声:{{ (audio_muted ? 'オフ' : 'オン') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -241,7 +245,7 @@ export default {
         ctx.fillStyle = 'rgba(200, 200, 200, 0.0)';
         ctx.fillRect(0, 0, canvas_width, canvas_height);
         // 波形線
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.strokeStyle = 'rgba(255, 255, 255, 1.0)';
         ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
         ctx.shadowBlur = 3;
