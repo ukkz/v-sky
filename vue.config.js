@@ -3,5 +3,11 @@ module.exports = {
     "vuetify",
   ],
   publicPath: '/v-sky/',
-  outputDir: 'docs'
+  outputDir: 'docs',
+  pages: {
+    index: {
+      entry: 'src/main.js',
+      title: 'Dashboard',
+    }
+  }
 }
