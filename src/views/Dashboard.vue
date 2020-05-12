@@ -127,11 +127,15 @@ export default {
           this.upsertPeers(peer_id, display_name, icon_url, joined_room_name, joined_room_type, null);
         } else {
           // 未登録のピア（新規ユーザー）には応答する
-          const outgoingDataConnection = this.$store.state.skyway.peer.connect(peer_id, {serialization: 'json'});
-          outgoingDataConnection.on('open', () => outgoingDataConnection.send(this.mydata));
-          this.dumpLog(display_name+'がオンラインになりました');
-          // 相手ピアIDをキー名としてピア情報を追加する
-          this.upsertPeers(peer_id, display_name, icon_url, joined_room_name, joined_room_type, outgoingDataConnection);
+          try {
+            const outgoingDataConnection = this.$store.state.skyway.peer.connect(peer_id, {serialization: 'json'});
+            outgoingDataConnection.on('open', () => outgoingDataConnection.send(this.mydata));
+            this.dumpLog(display_name+'がオンラインになりました');
+            // 相手ピアIDをキー名としてピア情報を追加する
+            this.upsertPeers(peer_id, display_name, icon_url, joined_room_name, joined_room_type, outgoingDataConnection);
+          } catch (e) {
+            // WIP
+          }
         }
       });
       // 特定のピアとのデータコネクションが切断されたとき
