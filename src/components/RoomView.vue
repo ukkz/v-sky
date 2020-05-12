@@ -16,8 +16,8 @@
           <v-col v-for="(stream, peer_id, index) in streams" :key="index" :cols="col_width" :sm="sm_width">
             <v-item>
               <v-responsive class="peer-frame">
-                <video class="video-stream ma-auto" :srcObject.prop="stream" autoplay playsinline></video>
-                <div style="position:absolute;top:16px;left:16px; color:white; text-shadow:1px 1px 3px black;">
+                <video class="video-stream ma-auto" :srcObject.prop="stream" autoplay playsinline :muted="(peer_id == my_id)"></video>
+                <div style="position:absolute;top:2%;left:2%; color:white; text-shadow:1px 1px 3px black;">
                   <v-avatar color="indigo">
                     <v-icon v-if="!peers[peer_id].icon_url" dark>mdi-account-circle</v-icon>
                     <img v-else :src="peers[peer_id].icon_url">
@@ -38,6 +38,10 @@
 export default {
   name: 'RoomView',
   props: {
+    my_id: {
+      type: String,
+      required: true,
+    },
     mydata: {
       type: Object,
       required: true,
