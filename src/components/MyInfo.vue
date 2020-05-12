@@ -5,7 +5,12 @@
     <v-card>
       <v-row justify="center" align="center" dense>
         <v-col cols="auto" v-if="!shrink" class="ma-2">
-          <video id="my-video-dashboard" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
+          <v-responsive>
+            <video id="my-video-dashboard" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
+            <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
+              <canvas id="my-wave-dashboard" style="width:100%;height:100%;"></canvas>
+            </div>
+          </v-responsive>
         </v-col>
         <v-col cols="auto">
           <v-row justify="center" align="center" class="my-2">
@@ -27,7 +32,7 @@
 
 
     <!-- 設定ダイアログ -->
-    <v-dialog v-model="open" persistent max-width="640">
+    <v-dialog v-model="open" max-width="640">
       <v-card>
         <v-list-item>
           <v-list-item-avatar color="indigo">
@@ -51,7 +56,16 @@
           映像または音声が正常に取得できていれば以下に表示されます。
         </v-card-text>
 
-        <video id="my-video-dialog" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
+        <v-row justify="center">
+          <v-col cols="8">
+            <v-responsive>
+              <video id="my-video-dialog" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
+              <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
+                <canvas id="my-wave-dialog" style="width:100%;height:100%;"></canvas>
+              </div>
+            </v-responsive>
+          </v-col>
+        </v-row>
 
         <v-card-actions>
           <v-btn text class="ma-1" color="green" @click="video_muted = !video_muted">映像{{ (video_muted ? 'オフ' : 'オン') }}</v-btn>
@@ -132,6 +146,7 @@ export default {
     // 最初にデバイスが存在すればデフォルトデバイスにする
     if (this.video_devices[0]) this.selectedVideo = this.video_devices[0];
     // 良いか悪いかわからんけどロード直後にそのままgetUserMediaしてしまう（許可でるやつ）
+    // PermissionAPIを使う？
     this.onChangeLocalDevice();
   },
 
@@ -171,7 +186,86 @@ export default {
         this.$store.commit('setLocalMediaStream', stream);
         // ルーム接続状態でデバイスが変更されたらストリームを付け替える
         this.$store.commit('replaceMyStream', stream);
+        // ビデオエリアの横幅を取得する
+        const video_tracks = stream.getVideoTracks();
+        const video_element_dashboard = document.getElementById('my-video-dashboard');
+        const video_element_dialog    = document.getElementById('my-video-dialog');
+        let wave_dashboard_width  = video_element_dashboard.offsetWidth;
+        let wave_dashboard_height = video_element_dashboard.offsetHeight;
+        let wave_dialog_width  = video_element_dialog.offsetWidth;
+        let wave_dialog_height = video_element_dialog.offsetHeight;
+        // 縦幅は実際のビデオの有無で計算する（大抵は4:3）
+        if (video_tracks[0]) {
+          // ビデオトラックがある場合：getSettings()で色々情報がとれる（その他、アスペクト比やフレームレートなど）
+          const video_track = video_tracks[0].getSettings();
+          wave_dashboard_height = wave_dashboard_width * video_track.height / video_track.width;
+          wave_dialog_height    = wave_dialog_width * video_track.height / video_track.width;
+        }
+        // 波形表示を開始
+        this.drawMicWave(stream, 'my-wave-dashboard', wave_dashboard_width, wave_dashboard_height, 15);
+        this.drawMicWave(stream, 'my-wave-dialog',    wave_dialog_width,    wave_dialog_height,    15);
       }
+    },
+
+    // マイク入力波形描画
+    drawMicWave: function(stream, canvas_id, canvas_width, canvas_height, fps = 30) {
+      // 音声ストリームが存在しない場合は描画しない
+      if (!stream || stream.getAudioTracks().length == 0) return;
+      //
+      const audioctx = new (window.AudioContext || window.webkitAudioContext)();
+      const input = audioctx.createMediaStreamSource(stream);
+      const analyser = audioctx.createAnalyser();
+      // AudioNode(input) -> AnalyserNode(analyser) -> AudioDestinationNode(audioctx)
+      input.connect(analyser);
+      // 以下はコメント解除するとループバック（アナライザーからオーディオ出力）するのでハウる
+      //analyser.connect(audioctx.destination);
+
+      // アナライザ設定
+      analyser.fftSize = 2048;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      // 波形表示対象のキャンバス
+      const canvas = document.getElementById(canvas_id);
+      const ctx = canvas.getContext('2d');
+      canvas.setAttribute("width", canvas_width);
+      canvas.setAttribute("height", canvas_height);
+      
+      // 描画処理
+      function draw() {
+        // ---- 処理開始 ----
+        const begin = Date.now();
+        // データ取得
+        analyser.getByteTimeDomainData(dataArray);
+        // キャンバスクリア
+        ctx.clearRect(0, 0, canvas_width, canvas_height);
+        ctx.fillStyle = 'rgba(200, 200, 200, 0.0)';
+        ctx.fillRect(0, 0, canvas_width, canvas_height);
+        // 波形線
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 1.0)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 3;
+        ctx.beginPath();
+        const sliceWidth = canvas_width * 1.0 / bufferLength;
+        let x = 0;
+        //
+        for (let i = 0; i < bufferLength; i++) {
+          const level = dataArray[i] / 128.0; // Uint8 = 0 ~ 255
+          const y = level * canvas_height/2;
+          if (i == 0) ctx.moveTo(x, y);
+          else        ctx.lineTo(x, y);
+          x += sliceWidth;          
+        }
+        // 波形描画
+        ctx.lineTo(canvas_width, canvas_height/2);
+        ctx.stroke();
+        // ---- 処理ここまで ----
+        // fpsにあわせて次回の描画タイミングをセット
+        const delay = 1000/fps - (Date.now() - begin);
+        setTimeout(draw, delay);
+      }
+      // 描画開始
+      setTimeout(draw, 0);
     },
 
     // ログアウトする
@@ -209,5 +303,6 @@ export default {
 #my-video-dialog {
   background-color: #A0A0A0;
   width: 100%;
+  height: auto;
 }
 </style>
