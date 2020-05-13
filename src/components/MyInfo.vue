@@ -24,15 +24,15 @@
             <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
             <v-btn outlined small class="ma-1" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted"><v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>音声</v-btn>
             <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="config_dialog = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
-            <v-btn outlined small class="ma-1" color="pink darken-1" @click="logout"><v-icon>mdi-logout</v-icon>ログアウト</v-btn>
+            <v-btn outlined small class="ma-1" color="pink darken-1" @click="logout"><v-icon>mdi-exit-run</v-icon>ログアウト</v-btn>
           </v-row>
         </v-col>
       </v-row>
     </v-card>
 
 
-    <!-- 設定ダイアログ -->
-    <v-dialog v-model="config_dialog" max-width="640">
+    <!-- 設定ダイアログ（smサイズ以下でフルスクリーン化） -->
+    <v-dialog v-model="config_dialog" max-width="640" :fullscreen="$vuetify.breakpoint.smAndDown">
       <v-card>
         <v-list-item>
           <v-list-item-avatar color="indigo">
@@ -71,10 +71,17 @@
 
         </v-row>
 
-        <v-card-actions>
+        <v-row class="pa-2" justify="center">
           <v-btn outlined class="ma-2" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted">映像:{{ (video_muted ? 'オフ' : 'オン') }}</v-btn>
           <v-btn outlined class="ma-2" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted">音声:{{ (audio_muted ? 'オフ' : 'オン') }}</v-btn>
-        </v-card-actions>
+        </v-row>
+
+        <!-- フルスクリーン時のみ補助ボタン（閉ボタン） -->
+        <v-divider v-if="$vuetify.breakpoint.smAndDown"></v-divider>
+        <v-row v-if="$vuetify.breakpoint.smAndDown" class="pa-2" justify="center">
+          <v-btn dark class="ma-2" color="indigo darken-4" @click="config_dialog = false">設定を閉じる</v-btn>
+        </v-row>
+
       </v-card>
     </v-dialog>
 
