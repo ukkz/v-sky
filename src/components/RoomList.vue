@@ -3,7 +3,7 @@
     <v-subheader>ルームリスト</v-subheader>
 
     <v-list-item v-for="(room_info, room_name, room_index) in rooms" :key="room_index">
-      <v-list-item-icon class="pt-1"><v-icon>mdi-chat-processing</v-icon></v-list-item-icon>
+      <v-list-item-icon class="pt-0"><v-icon>mdi-chat-processing</v-icon></v-list-item-icon>
       <v-list-item-content>
         <v-list-item-title>{{ room_name }}</v-list-item-title>
         <v-list-item-subtitle>
@@ -14,14 +14,14 @@
         <v-btn outlined small color="secondary" disabled>{{ room_info.type }}</v-btn>
       </v-list-item-content>
       <v-list-item-action>
-        <v-btn rounded color="primary" @click="$store.commit('setJoinedRoom', {name: room_name, type: room_info.type})">入室</v-btn>
+        <v-btn rounded color="primary" @click="$store.commit('setJoinedRoom', {name: room_name, type: room_info.type})"><v-icon>mdi-account-arrow-right</v-icon>入室</v-btn>
       </v-list-item-action>
     </v-list-item>
 
     <v-divider></v-divider>
 
     <v-list-item>
-      <v-list-item-icon class="pt-5"><v-icon>mdi-chat-plus</v-icon></v-list-item-icon>
+      <v-list-item-icon class="pt-4"><v-icon>mdi-chat-plus</v-icon></v-list-item-icon>
       <v-list-item-content>
         <v-form ref="form" v-model="new_room.valid" @submit.prevent>
           <v-text-field class="" v-model="new_room.name" :rules="room_name_rules" label="新規ルーム名を入力…" counter maxlength="20"></v-text-field>

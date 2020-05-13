@@ -1,15 +1,21 @@
 <template>
   <v-card class="mx-auto" outlined style="height:100%;">
+
+    <!-- ルームの情報 -->
     <v-list-item>
+      <!-- ルーム名 -->
       <v-list-item-content>
         <v-list-item-title class="headline">{{ mydata.joined_room_name }} [{{ mydata.joined_room_type.toUpperCase() }}]</v-list-item-title>
         <v-list-item-subtitle>参加数: {{ rooms[mydata.joined_room_name].members.length }}</v-list-item-subtitle>
       </v-list-item-content>
+      <!-- 退室ボタン -->
       <v-list-item-action>
-        <v-btn rounded color="warning" @click="$store.commit('clearJoinedRoom')">退室</v-btn>
+        <v-btn v-if="$vuetify.breakpoint.smAndDown" fab small dark color="pink lighten-1" @click="$store.commit('clearJoinedRoom')"><v-icon>mdi-logout</v-icon></v-btn>
+        <v-btn v-else rounded dark color="pink lighten-1" @click="$store.commit('clearJoinedRoom')"><v-icon>mdi-logout</v-icon>退室</v-btn>
       </v-list-item-action>
     </v-list-item>
   
+    <!-- ストリーム -->
     <v-item-group>
       <v-container>
         <v-row dense>
