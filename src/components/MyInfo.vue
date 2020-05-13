@@ -4,7 +4,7 @@
     <!-- ダッシュボード上部に常駐する部分 -->
     <v-card outlined>
       <v-row justify="center" align="center" dense>
-        <v-col cols="auto" class="ma-2" v-if="!shrink">
+        <v-col cols="auto" class="ma-2" v-show="!shrink">
           <v-responsive>
             <video id="my-video-dashboard" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
             <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
@@ -13,7 +13,7 @@
           </v-responsive>
         </v-col>
         <v-col cols="auto">
-          <v-row justify="center" align="center" class="my-2" v-if="!shrink">
+          <v-row justify="center" align="center" class="my-2" v-show="!shrink">
             <v-avatar color="indigo" size="32">
               <v-icon v-if="!mydata.icon_url" dark>mdi-account-circle</v-icon>
               <img v-else :src="mydata.icon_url">
@@ -203,10 +203,8 @@ export default {
         if (e instanceof OverconstrainedError) alert('指定のカメラはこの端末では利用できません。別のカメラを選択してください。');
         console.log('デバイス選択エラー:', e);
       } finally {
-        // ストリームをセット
+        // ストリームをセット（すでにルーム接続状態であれば自動でreplaceしてくれる・Vuexのmutationを参照）
         this.$store.commit('setLocalMediaStream', mystream);
-        // ルーム接続状態でデバイスが変更されたらストリームを付け替える
-        this.$store.commit('replaceMyStream', mystream);
         // ビデオエリアの横幅を取得する
         const video_tracks = (mystream) ? mystream.getVideoTracks() : [];
         const video_element_dashboard = document.getElementById('my-video-dashboard');

@@ -40,7 +40,13 @@ export default new Vuex.Store({
     },
     clearJoinedRoom(state) { state.user_info.room = '' },
     setIsInLineApp(state, tf) { state.in_line_app = tf },
-    setLocalMediaStream(state, stream) { state.local_media_stream = stream },
+    setLocalMediaStream(state, stream) {
+      // ルーム接続状態であれば先にreplaceする
+      if (state.skyway.room != '') state.skyway.room.replaceStream(stream);
+      // 以前のストリームが存在する場合は破棄してから新しくセットする
+      this.commit('destroyLocalMediaStream');
+      state.local_media_stream = stream;
+    },
     destroyLocalMediaStream(state) {
       if (state.local_media_stream != '') {
         state.local_media_stream.getTracks().forEach(track => {
@@ -49,9 +55,6 @@ export default new Vuex.Store({
           state.local_media_stream.removeTrack(track);
         });
       }
-    },
-    replaceMyStream(state, new_stream) {
-      if (state.skyway.room != '') state.skyway.room.replaceStream(new_stream);
     },
     logout(state) {
       state.login_status = false;
