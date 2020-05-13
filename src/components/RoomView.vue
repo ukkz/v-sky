@@ -5,8 +5,8 @@
     <v-list-item>
       <!-- ルーム名 -->
       <v-list-item-content>
-        <v-list-item-title class="headline">{{ mydata.joined_room_name }} [{{ mydata.joined_room_type.toUpperCase() }}]</v-list-item-title>
-        <v-list-item-subtitle>参加数: {{ rooms[mydata.joined_room_name].members.length }}</v-list-item-subtitle>
+        <v-list-item-title class="headline">{{ peers[my_id].joined_room_name }} [{{ peers[my_id].joined_room_type.toUpperCase() }}]</v-list-item-title>
+        <v-list-item-subtitle>参加数: {{ rooms[peers[my_id].joined_room_name].members.length }}</v-list-item-subtitle>
       </v-list-item-content>
       <!-- 退室ボタン -->
       <v-list-item-action>
@@ -43,13 +43,10 @@
 <script>
 export default {
   name: 'RoomView',
+
   props: {
     my_id: {
       type: String,
-      required: true,
-    },
-    mydata: {
-      type: Object,
       required: true,
     },
     rooms: {

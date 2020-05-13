@@ -15,7 +15,7 @@
       </v-col>
       <!-- ルームに入っているとき：ルーム内表示 -->
       <v-col v-else cols="12">
-        <RoomView :my_id="my_id" :mydata="mydata" :rooms="rooms" :streams="room_streams" :peers="peers" />
+        <RoomView :my_id="my_id" :rooms="rooms" :streams="room_streams" :peers="peers" />
       </v-col>
 
       <!-- ピア一覧を表示 -->
