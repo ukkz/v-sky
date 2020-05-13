@@ -8,7 +8,7 @@
     <v-row justify="center">
 
       <!-- ルームに入っていないとき：一覧表示 -->
-      <v-col v-if="!in_room" cols="12" sm="8">
+      <v-col v-if="!in_room" cols="12" :sm="(show_peerlist) ? 8 : 12">
         <RoomList :rooms="rooms" :peers="peers" />
       </v-col>
 
@@ -17,8 +17,8 @@
         <RoomView :my_id="my_id" :mydata="mydata" :rooms="rooms" :streams="room_streams" :peers="peers" />
       </v-col>
 
-      <!-- ルームに入っていないとき：ピア一覧を表示 -->
-      <v-col v-if="!in_room" cols="12" sm="4">
+      <!-- ピア一覧を表示 -->
+      <v-col v-if="show_peerlist" cols="12" sm="4">
         <UserList :peers="peers" />
       </v-col>
 
@@ -62,6 +62,8 @@ export default {
       // ピア状態
       peers: {},
       data_connections: {},
+      // その他設定
+      show_peerlist: false,
     }
   },
 
