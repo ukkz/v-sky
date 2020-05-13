@@ -112,7 +112,7 @@ export default {
 }
 .peer-icon {
   position:absolute;
-  top:2%;left:2%;
+  top:10px;left:10px;
   color:white;
   text-shadow:1px 1px 3px black;
 }
