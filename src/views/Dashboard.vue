@@ -1,17 +1,18 @@
 <template>
-  <v-container fluid>
+  <v-container style="height:100%;">
 
-    <v-row justify="center">
+    <!-- サブ部：入室時はshrinkして簡易表示（高さ縮小） -->
+    <v-row ref="sub" justify="center" class="my-n5">
       <MyInfo :mydata="mydata" :shrink="in_room" /> <!-- Vuex使っているので状態管理に注意（疎結合でないためそのうち修正します） -->
     </v-row>
 
-    <v-row justify="center">
+    <!-- メイン部：高さ自動調整（ルーム内自動レイアウト用） -->
+    <v-row ref="main" justify="center" v-bind:style="style_main">
 
       <!-- ルームに入っていないとき：一覧表示 -->
       <v-col v-if="!in_room" cols="12" :sm="(show_peerlist) ? 8 : 12">
         <RoomList :rooms="rooms" :peers="peers" />
       </v-col>
-
       <!-- ルームに入っているとき：ルーム内表示 -->
       <v-col v-else cols="12">
         <RoomView :my_id="my_id" :mydata="mydata" :rooms="rooms" :streams="room_streams" :peers="peers" />
@@ -64,6 +65,10 @@ export default {
       data_connections: {},
       // その他設定
       show_peerlist: false,
+      // スタイル
+      style_main: {
+        height: '100%',
+      },
     }
   },
 
@@ -147,6 +152,13 @@ export default {
         this.removePeers(peer_id);
       });
     });
+  },
+
+  // 状態変化に伴うrerender後に発火
+  updated() {
+    // this.$refs.main の高さを調整する
+    const offset = parseInt(this.$refs.sub.offsetHeight) - 48;
+    this.style_main.height = 'calc(100% - ' + offset + 'px)';
   },
 
   methods: {

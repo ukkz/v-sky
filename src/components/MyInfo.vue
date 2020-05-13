@@ -1,10 +1,10 @@
 <template>
-  <v-container fluid>
+  <v-container>
 
     <!-- ダッシュボード上部に常駐する部分 -->
-    <v-card>
+    <v-card outlined>
       <v-row justify="center" align="center" dense>
-        <v-col cols="auto" v-if="!shrink" class="ma-2">
+        <v-col cols="auto" class="ma-2" v-if="!shrink">
           <v-responsive>
             <video id="my-video-dashboard" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
             <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
@@ -13,7 +13,7 @@
           </v-responsive>
         </v-col>
         <v-col cols="auto">
-          <v-row justify="center" align="center" class="my-2">
+          <v-row justify="center" align="center" class="my-2" v-if="!shrink">
             <v-avatar color="indigo" size="32">
               <v-icon v-if="!mydata.icon_url" dark>mdi-account-circle</v-icon>
               <img v-else :src="mydata.icon_url">

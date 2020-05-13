@@ -1,5 +1,5 @@
 <template>
-  <v-card class="mx-auto">
+  <v-card class="mx-auto" outlined style="height:100%;">
     <v-list-item>
       <v-list-item-content>
         <v-list-item-title class="headline">{{ mydata.joined_room_name }} [{{ mydata.joined_room_type.toUpperCase() }}]</v-list-item-title>
@@ -15,9 +15,9 @@
         <v-row dense>
           <v-col v-for="(stream, peer_id, index) in streams" :key="index" :cols="col_width" :sm="sm_width">
             <v-item>
-              <v-responsive class="peer-frame">
+              <v-responsive class="peer-frame" :aspect-ratio="16/5">
                 <video class="video-stream ma-auto" :srcObject.prop="stream" autoplay playsinline :muted="(peer_id == my_id)"></video>
-                <div style="position:absolute;top:2%;left:2%; color:white; text-shadow:1px 1px 3px black;">
+                <div class="peer-icon">
                   <v-avatar color="indigo">
                     <v-icon v-if="!peers[peer_id].icon_url" dark>mdi-account-circle</v-icon>
                     <img v-else :src="peers[peer_id].icon_url">
@@ -104,10 +104,16 @@ export default {
 <style lang="scss">
 .video-stream {
   background-color: #A0A0A0;
-  width: 100%;
-  height: auto;
+  //width: 100%;
+  //height: auto;
 }
 .peer-frame {
   overflow: hidden;
+}
+.peer-icon {
+  position:absolute;
+  top:2%;left:2%;
+  color:white;
+  text-shadow:1px 1px 3px black;
 }
 </style>

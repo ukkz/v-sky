@@ -1,7 +1,7 @@
 <template>
   <v-app>
 
-    <v-app-bar app color="primary" dark>
+    <v-app-bar app color="primary" dark dense flat>
       <div class="d-flex align-center">
         <!-- <router-link :to="{ name: 'Dashboard' }"><h1>v-sky</h1></router-link> -->
         <h1>{{ title }}</h1>
