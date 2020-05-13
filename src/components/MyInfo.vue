@@ -23,7 +23,7 @@
           <v-row justify="center" class="my-2">
             <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
             <v-btn outlined small class="ma-1" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted"><v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>音声</v-btn>
-            <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="open = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
+            <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="config_dialog = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
             <v-btn outlined small class="ma-1" color="pink darken-1" @click="logout"><v-icon>mdi-logout</v-icon>ログアウト</v-btn>
           </v-row>
         </v-col>
@@ -32,7 +32,7 @@
 
 
     <!-- 設定ダイアログ -->
-    <v-dialog v-model="open" max-width="640">
+    <v-dialog v-model="config_dialog" max-width="640">
       <v-card>
         <v-list-item>
           <v-list-item-avatar color="indigo">
@@ -43,7 +43,7 @@
             <v-list-item-title class="headline">{{ mydata.display_name }}</v-list-item-title>
             <v-list-item-subtitle>{{ user_status }}</v-list-item-subtitle>
           </v-list-item-content>
-          <v-btn icon large color="black" @click="open = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn icon large color="black" @click="config_dialog = false"><v-icon>mdi-close</v-icon></v-btn>
         </v-list-item>
 
         <v-divider></v-divider>
@@ -71,10 +71,19 @@
 
         </v-row>
 
-        <v-card-actions justify="center">
+        <v-card-actions>
           <v-btn outlined class="ma-2" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted">映像:{{ (video_muted ? 'オフ' : 'オン') }}</v-btn>
           <v-btn outlined class="ma-2" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted">音声:{{ (audio_muted ? 'オフ' : 'オン') }}</v-btn>
         </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="permission_dialog" max-width="300" persistent>
+      <v-card>
+        <v-card-text class="pt-3" justify="center">
+          <v-btn outlined class="ma-2" color="blue" @click="permission_dialog = false; onChangeLocalDevice();">カメラ・マイクを利用する</v-btn>
+          ボタンをクリックするとポップアップが表示されますので「許可」をクリックしてください。
+        </v-card-text>
       </v-card>
     </v-dialog>
 
@@ -106,7 +115,8 @@ export default {
 
   data() {
     return {
-      open: true, // ダイアログは最初に必ず開く
+      config_dialog: true, // ダイアログは最初に必ず開く
+      permission_dialog: false,
       audio_devices: [
         {
           text: '使用しない',
@@ -149,9 +159,16 @@ export default {
       .map(video => this.video_devices.unshift({text: video.label || `カメラ ${this.video_devices.length + 1}`, value: video.deviceId}));
     // 最初にデバイスが存在すればデフォルトデバイスにする
     if (this.video_devices[0]) this.selectedVideo = this.video_devices[0];
-    // 良いか悪いかわからんけどロード直後にそのままgetUserMediaしてしまう（許可でるやつ）
-    // PermissionAPIを使う？
-    this.onChangeLocalDevice();
+
+    // カメラとマイクのパーミッションを確認
+    if (await this.device_allowed()) {
+      // 許可済みの場合はそのままgetUserMedia
+      this.onChangeLocalDevice();
+    } else {
+      // 未許可または拒否の場合はとりあえずダイアログを出す
+      // このダイアログ内のボタンを明示的に押してonChangeLocalDeviceを発火させる
+      this.permission_dialog = true;
+    }
   },
 
   methods: {
@@ -177,9 +194,9 @@ export default {
         video: constraint_video,
       };
       // ストリームは空白状態では何も送信しない（受信専用ピアになる）
-      let stream = '';
+      let mystream = '';
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        mystream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (e) {
         if (e instanceof TypeError) alert('映像入力と音声入力を両方とも使用しない場合、メディアは受信専用でテキスト送受信のみ可能となります。');
         if (e instanceof DOMException) alert('デバイスの利用が許可されませんでした。メディアは受信専用でテキスト送受信のみ可能となります。');
@@ -187,11 +204,11 @@ export default {
         console.log('デバイス選択エラー:', e);
       } finally {
         // ストリームをセット
-        this.$store.commit('setLocalMediaStream', stream);
+        this.$store.commit('setLocalMediaStream', mystream);
         // ルーム接続状態でデバイスが変更されたらストリームを付け替える
-        this.$store.commit('replaceMyStream', stream);
+        this.$store.commit('replaceMyStream', mystream);
         // ビデオエリアの横幅を取得する
-        const video_tracks = stream.getVideoTracks();
+        const video_tracks = (mystream) ? mystream.getVideoTracks() : [];
         const video_element_dashboard = document.getElementById('my-video-dashboard');
         const video_element_dialog    = document.getElementById('my-video-dialog');
         let wave_dashboard_width  = video_element_dashboard.offsetWidth;
@@ -199,15 +216,15 @@ export default {
         let wave_dialog_width  = video_element_dialog.offsetWidth;
         let wave_dialog_height = video_element_dialog.offsetHeight;
         // 縦幅は実際のビデオの有無で計算する（大抵は4:3）
-        if (video_tracks[0]) {
+        if (mystream && video_tracks[0]) {
           // ビデオトラックがある場合：getSettings()で色々情報がとれる（その他、アスペクト比やフレームレートなど）
           const video_track = video_tracks[0].getSettings();
           wave_dashboard_height = wave_dashboard_width * video_track.height / video_track.width;
           wave_dialog_height    = wave_dialog_width * video_track.height / video_track.width;
         }
         // 波形表示を開始
-        this.drawMicWave(stream, 'my-wave-dashboard', wave_dashboard_width, wave_dashboard_height, 15);
-        this.drawMicWave(stream, 'my-wave-dialog',    wave_dialog_width,    wave_dialog_height,    15);
+        this.drawMicWave(mystream, 'my-wave-dashboard', wave_dashboard_width, wave_dashboard_height, 15);
+        this.drawMicWave(mystream, 'my-wave-dialog',    wave_dialog_width,    wave_dialog_height,    15);
       }
     },
 
@@ -270,6 +287,14 @@ export default {
       }
       // 描画開始
       setTimeout(draw, 0);
+    },
+
+    // カメラとマイク両方のPermissionがgrantedかどうか
+    device_allowed: async function() {
+      const cam = await navigator.permissions.query({name: 'camera'});
+      const mic = await navigator.permissions.query({name: 'microphone'});
+      // granted/prompt/denied
+      return (cam.state == 'granted' && mic.state == 'granted');
     },
 
     // ログアウトする
