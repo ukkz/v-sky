@@ -7,14 +7,14 @@
       <v-list-item-content>
         <v-list-item-title>{{ room_name }}</v-list-item-title>
         <v-list-item-subtitle>
-          <v-chip class="mx-1" x-small v-for="(peer_id, index) in room_info.members" :key="index">{{ peers[peer_id].display_name }}</v-chip>
+          <v-chip class="mx-1" x-small v-for="(peer_id, index) in room_info.members" :key="index">{{ peers[peer_id].name }}</v-chip>
         </v-list-item-subtitle>
       </v-list-item-content>
       <v-list-item-content>
         <v-btn outlined small color="secondary" disabled>{{ room_info.type }}</v-btn>
       </v-list-item-content>
       <v-list-item-action>
-        <v-btn rounded color="primary" @click="$store.commit('setJoinedRoom', {name: room_name, type: room_info.type})"><v-icon>mdi-account-arrow-right</v-icon>入室</v-btn>
+        <v-btn rounded color="primary" @click="$store.dispatch('setMyRoom', {name: room_name, type: room_info.type})"><v-icon>mdi-account-arrow-right</v-icon>入室</v-btn>
       </v-list-item-action>
     </v-list-item>
 
@@ -40,7 +40,7 @@
           </template>
           <span>SFUサーバーを経由するため途中で暗号化が解除されますが、多人数での利用が可能です。</span>
         </v-tooltip>
-        <v-btn rounded small color="red" @click="$store.commit('setJoinedRoom', {name: new_room.name, type: ((new_room.is_mesh) ? 'mesh' : 'sfu')})" :disabled="!new_room.valid">作成&入室</v-btn>
+        <v-btn rounded small color="red" @click="$store.dispatch('setMyRoom', {name: new_room.name, type: ((new_room.is_mesh) ? 'mesh' : 'sfu')})" :disabled="!new_room.valid">作成&入室</v-btn>
       </v-list-item-action>
     </v-list-item>
 

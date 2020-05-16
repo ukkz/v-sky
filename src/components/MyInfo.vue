@@ -15,10 +15,10 @@
         <v-col cols="auto">
           <v-row justify="center" align="center" class="my-2" v-show="!shrink">
             <v-avatar color="indigo" size="32">
-              <v-icon v-if="!mydata.icon_url" dark>mdi-account-circle</v-icon>
-              <img v-else :src="mydata.icon_url">
+              <v-icon v-if="!me.icon_url" dark>mdi-account-circle</v-icon>
+              <img v-else :src="me.icon_url">
             </v-avatar>
-            <h3 class="mx-2">{{ mydata.display_name }} さん</h3>
+            <h3 class="mx-2">{{ me.name }} さん</h3>
           </v-row>
           <v-row justify="center" class="my-2">
             <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
@@ -36,12 +36,12 @@
       <v-card>
         <v-list-item>
           <v-list-item-avatar color="indigo">
-            <v-icon v-if="!mydata.icon_url" dark>mdi-account-circle</v-icon>
-            <img v-else :src="mydata.icon_url">
+            <v-icon v-if="!me.icon_url" dark>mdi-account-circle</v-icon>
+            <img v-else :src="me.icon_url">
           </v-list-item-avatar>
           <v-list-item-content>
-            <v-list-item-title class="headline">{{ mydata.display_name }}</v-list-item-title>
-            <v-list-item-subtitle>{{ user_status }}</v-list-item-subtitle>
+            <v-list-item-title class="headline">{{ me.name }}</v-list-item-title>
+            <v-list-item-subtitle>{{ me.status }}</v-list-item-subtitle>
           </v-list-item-content>
           <v-btn icon large color="black" @click="config_dialog = false"><v-icon>mdi-close</v-icon></v-btn>
         </v-list-item>
@@ -108,16 +108,10 @@ export default {
       required: false,
       default: false,
     },
-    mydata: {
+    me: {
       type: Object,
       required: true,
     },
-    /* MyDataオブジェクト
-     * - display_name    : [String] 表示名
-     * - icon_url        : [String] アイコン画像URL
-     * - joined_room_name: [String] ルーム名
-     * - joined_room_type: [String] 'mesh' or 'sfu'
-    */
   },
 
   data() {
@@ -181,8 +175,6 @@ export default {
   methods: {
     // 映像・音声デバイスが変更されたら発火
     onChangeLocalDevice: async function() {
-      // すべてのトラックを一旦破棄する
-      this.$store.commit('destroyLocalMediaStream');
       // 映像デバイスの細かな指定
       let constraint_video;
       if (this.selectedVideo) {
@@ -303,20 +295,10 @@ export default {
     },
 
     // ログアウトする
-    logout: async function() {
-      // SkyWay切断
-      this.$store.state.skyway.peer.destroy();
-      // ストリーム停止（カメラとマイクを切る）
-      this.$store.commit('destroyLocalMediaStream');
-      // ログアウト前処理
+    logout: function() {
       // store/index.jsのactionsでLINEログアウト処理などを行ったのち状態変数をログアウトに
       this.$store.dispatch('logout');
-      // computedとwatchで変数の変化を検出してLoginページに飛ばしている
     },
-  },
-
-  computed: {
-    user_status() { return this.$store.state.user_info.status },
   },
 
   watch: {
