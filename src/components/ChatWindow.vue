@@ -11,7 +11,7 @@
 
       <v-divider></v-divider>
 
-      <v-card-text ref="message_area" style="height:70vh;" class="px-2">
+      <v-card-text ref="message_area" style="height:90vh;" class="px-2">
         <v-list subheader style="background-color:transparent;" class="mb-10">
 
           <!-- 基本CSSはmessageクラス・自分のみmessage-meクラス追加 -->
