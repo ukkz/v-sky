@@ -12,7 +12,7 @@
       <v-divider></v-divider>
 
       <v-card-text ref="message_area" style="height:90vh;" class="px-2">
-        <v-list subheader style="background-color:transparent;" class="mb-10">
+        <v-list subheader style="background-color:transparent;" class="pt-2 mb-10">
 
           <!-- 基本CSSはmessageクラス・自分のみmessage-meクラス追加 -->
           <v-list-item v-for="(payload, index) in chat_payloads" :key="index" class="px-0 message" :class="{ 'message-me': (payload.id == me.id && payload.type == 'user') }">
@@ -24,8 +24,8 @@
 
               <!-- メッセージ本文 -->
               <v-list-item-title class="frame">
-                <div v-if="payload.type == 'user'" class="body pa-2 green accent-1">{{ payload.body }}</div>
-                <div v-else class="body pa-2 cyan lighten-3" >{{ payload.body }}</div>
+                <div v-if="payload.type == 'user'" class="body text-wrap pa-2 green accent-1">{{ payload.body }}</div>
+                <div v-else class="body text-wrap pa-2 cyan lighten-3" >{{ payload.body }}</div>
               </v-list-item-title>
 
             </v-list-item-content>
@@ -113,10 +113,14 @@ export default {
 
 <style lang="scss">
 // メッセージ全体
-.message {  }
-.message .frame { overflow:visible; }
+.message {
+  align-items: end; // アイコンと吹き出しの高さをあわせる
+}
+.message .frame { overflow:visible; width:100%; }
 .message .frame div.body {
   display: inline-block;
+  max-width: 85%; // 吹き出しの幅
+  text-align: left; // アラビア語などではrightにする（多言語対応後）
   box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.5);
   border-radius: 0 20px 20px 20px;
 }
