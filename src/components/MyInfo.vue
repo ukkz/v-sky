@@ -58,6 +58,7 @@
           <v-col cols="6">
             <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" :disabled="video_muted" class="mt-2"></v-select>
             <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" :disabled="audio_muted" class="mt-n2"></v-select>
+            <v-switch v-model="speech_onoff" :disabled="!speech_available" :label="`音声認識：${(!speech_available)?'非対応':(speech_onoff)?'有効':'無効'}`"></v-switch>
           </v-col>
 
           <v-col cols="6">
@@ -88,7 +89,7 @@
     <v-dialog v-model="permission_dialog" max-width="300" persistent>
       <v-card>
         <v-card-text class="pt-3" justify="center">
-          <v-btn outlined class="ma-2" color="blue" @click="permission_dialog = false; onChangeLocalDevice();">カメラ・マイクを利用する</v-btn>
+          <v-btn outlined class="ma-2" color="blue" @click="permission_dialog = false; onChangeLocalDevice();">カメラ・マイクを利用する</v-btn><br>
           ボタンをクリックするとポップアップが表示されますので「許可」をクリックしてください。
         </v-card-text>
       </v-card>
@@ -142,6 +143,7 @@ export default {
       selectedVideo: '',
       audio_muted: false,
       video_muted: false,
+      speech_available: false,
     }
   },
 
@@ -162,7 +164,7 @@ export default {
     if (this.video_devices[0]) this.selectedVideo = this.video_devices[0];
 
     // カメラとマイクのパーミッションを確認
-    if (await this.device_allowed()) {
+    if (await this.cam_allowed() && await this.mic_allowed()) {
       // 許可済みの場合はそのままgetUserMedia
       this.onChangeLocalDevice();
     } else {
@@ -170,6 +172,12 @@ export default {
       // このダイアログ内のボタンを明示的に押してonChangeLocalDeviceを発火させる
       this.permission_dialog = true;
     }
+  },
+
+  updated: async function() {
+    // 音声認識が利用できるかどうか（WebSpeechAPIの対応状況・マイクの利用許可確認）
+    window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+    this.speech_available = (await this.mic_allowed() && 'SpeechRecognition' in window);
   },
 
   methods: {
@@ -286,18 +294,29 @@ export default {
       setTimeout(draw, 0);
     },
 
-    // カメラとマイク両方のPermissionがgrantedかどうか
-    device_allowed: async function() {
+    // カメラ・マイクそれぞれのPermissionがgrantedかどうか
+    cam_allowed: async function() {
       const cam = await navigator.permissions.query({name: 'camera'});
+      // granted/prompt/denied
+      return (cam.state == 'granted');
+    },
+    mic_allowed: async function() {
       const mic = await navigator.permissions.query({name: 'microphone'});
       // granted/prompt/denied
-      return (cam.state == 'granted' && mic.state == 'granted');
+      return (mic.state == 'granted');
     },
 
     // ログアウトする
     logout: function() {
       // store/index.jsのactionsでLINEログアウト処理などを行ったのち状態変数をログアウトに
       this.$store.dispatch('logout');
+    },
+  },
+
+  computed: {
+    speech_onoff: {
+      get() { return this.$store.state.config.speech_recognition },
+      set(onoff) { this.$store.commit('speechConfig', onoff) },
     },
   },
 

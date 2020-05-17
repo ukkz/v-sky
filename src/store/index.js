@@ -5,8 +5,9 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
-    debug: false,
+    // ログイン状態（ここの値を変えることでログイン・ログアウト制御）
     logged_in: false,
+    // 自Peerの状態（他Peersと交換する）
     me: {
       id: '',
       name: '',
@@ -17,7 +18,12 @@ export default new Vuex.Store({
         type: '',
       },
     },
-    meObject: { id: '', name: '', icon_url: '', status: '', room: {name: '', type: ''} },
+    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '' } },
+    // グローバルな設定変数
+    config: {
+      debug: false,
+      speech_recognition: false,
+    },
     in_line_app: false,
     // メディアストリーム
     local_media_stream: null,
@@ -58,6 +64,9 @@ export default new Vuex.Store({
     // ルームに入る時の引数は {name: ルーム名, type: meshまたはsfu}
     _setMyRoom(state, newroom) { Vue.set(state.me, 'room', newroom) },
     _clearMyRoom(state) { Vue.set(state.me, 'room', { name: '', type: '' }) },
+
+    // その他の設定変更
+    speechConfig(state, onoff) { state.config.speech_recognition = onoff },
 
     setIsInLineApp(state, tf) { state.in_line_app = tf },
 

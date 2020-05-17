@@ -94,10 +94,10 @@ export default {
   // 自分のRoomに名前が入る > v-ifで描画 > createdで実際にルームにjoinする
   created() {
     this.join(this.me.room);
-    this.initSpeechRecognition();
+    if (this.speech_onoff) this.startSpeechRecognition();
   },
   beforeDestroy() {
-    this.clearSpeechRecognition();
+    if (this.speech_onoff) this.endSpeechRecognition();
     this.leave();
   },
 
@@ -146,6 +146,8 @@ export default {
           return 6;
       }
     },
+    // グローバル設定値監視：音声認識
+    speech_onoff() { return this.$store.state.config.speech_recognition }
   },
 
   watch: {
@@ -159,6 +161,11 @@ export default {
         this.addMyStream(this.mystream);
       }
     },
+    // グローバル設定値変更検知：音声認識
+    speech_onoff(current, previous) {
+      if (current && !previous) this.startSpeechRecognition(); // 途中でオンにした
+      if (!current && previous) this.endSpeechRecognition();   // 途中でオフにした
+    }
   },
 
   methods: {
@@ -168,15 +175,15 @@ export default {
     removeAllStreams: function() { this.$set(this, 'streams', {}) },
 
     // 文字起こし開始
-    initSpeechRecognition() {
+    startSpeechRecognition() {
       window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       if ('SpeechRecognition' in window) {
         this.sr.available = true;
-        console.log('音声認識: 対応');
+        if (this.develop_mode) console.log('音声認識が開始されました');
       } else {
         this.sr.available = false;
-        console.log('音声認識: 非対応');
-        return;
+        if (this.develop_mode) console.log('音声認識に対応していないブラウザです');
+        return; // 文字起こししない
       }
       // 音声認識の開始
       this.sr.obj = new SpeechRecognition();
@@ -187,7 +194,6 @@ export default {
       this.sr.obj.start();
       // 以下イベントハンドラ
       this.sr.obj.onresult = (e) => {
-        //this.sr.obj.stop();
         this.sr.buffer = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
           let transcript = e.results[i][0].transcript;
@@ -208,11 +214,12 @@ export default {
     },
 
     // 文字起こし終了
-    clearSpeechRecognition() {
+    endSpeechRecognition() {
       if (this.sr.available && this.sr.obj) {
-        this.sr.obj.stop();
+        this.sr.obj.abort();
         this.sr.obj = null;
         this.sr.buffer = '';
+        if (this.develop_mode) console.log('音声認識を終了しました');
       }
     },
 
