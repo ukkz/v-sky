@@ -316,14 +316,19 @@ export default {
   computed: {
     speech_onoff: {
       get() { return this.$store.state.config.speech_recognition },
-      set(onoff) { this.$store.commit('speechConfig', onoff) },
+      // 音声認識を変更できるとき ... 音声ミュートしていない または ミュート中に認識機能をオフにする場合
+      set(onoff) { if (!this.audio_muted || (this.audio_muted && !onoff)) this.$store.commit('speechConfig', onoff) },
     },
   },
 
   watch: {
-    // 映像または音声のミュート
-    audio_muted: function(state) { this.$store.state.local_media_stream.getAudioTracks().forEach(track => track.enabled = !state) },
+    // 映像・音声のミュート
     video_muted: function(state) { this.$store.state.local_media_stream.getVideoTracks().forEach(track => track.enabled = !state) },
+    audio_muted: function(state) {
+      this.$store.state.local_media_stream.getAudioTracks().forEach(track => track.enabled = !state);
+      // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
+      if (state) this.speech_onoff = false;
+    },
   },
 }
 </script>
