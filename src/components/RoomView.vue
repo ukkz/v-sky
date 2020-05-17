@@ -43,7 +43,7 @@
     </v-item-group>
 
     <!-- :showで開く・toggleイベント受信で閉じる・sendイベント受信でメッセージ送信&チャット配列反映・反映後のチャット配列はそのままpropsで渡す -->
-    <ChatWindow :show="chat_open" v-on:toggle="chat_open=$event" :me="me" :chat_payloads="chat_payloads" v-on:send="sendPayload($event)" />
+    <ChatWindow :show="chat_open" v-on:toggle="chat_open=$event" :me="me" :messages="chat_payloads" v-on:send="sendPayload($event)" />
 
   </v-card>
 
@@ -82,12 +82,24 @@ export default {
       // chat内をpeerの要素リンクにすると退室したら参照できなくなるので注意
       chat_open: false,
       chat_payloads: [],
+      // 音声認識
+      sr: {
+        available: false,
+        obj: null,
+        buffer: '',
+      },
     }
   },
 
   // 自分のRoomに名前が入る > v-ifで描画 > createdで実際にルームにjoinする
-  created() { this.join(this.me.room) },
-  beforeDestroy() { this.leave() },
+  created() {
+    this.join(this.me.room);
+    this.initSpeechRecognition();
+  },
+  beforeDestroy() {
+    this.clearSpeechRecognition();
+    this.leave();
+  },
 
   computed: {
     // このルームに参加している人数（受信専用も含むためストリーム数では数えられない）
@@ -155,6 +167,55 @@ export default {
     removeStream: function(target_id) { this.$delete(this.streams, target_id) },
     removeAllStreams: function() { this.$set(this, 'streams', {}) },
 
+    // 文字起こし開始
+    initSpeechRecognition() {
+      window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      if ('SpeechRecognition' in window) {
+        this.sr.available = true;
+        console.log('音声認識: 対応');
+      } else {
+        this.sr.available = false;
+        console.log('音声認識: 非対応');
+        return;
+      }
+      // 音声認識の開始
+      this.sr.obj = new SpeechRecognition();
+      this.sr.obj.interimResults = true;
+      this.sr.obj.continuous = true;
+      this.sr.obj.lang = 'ja-JP';
+      // 文字起こしを開始
+      this.sr.obj.start();
+      // 以下イベントハンドラ
+      this.sr.obj.onresult = (e) => {
+        //this.sr.obj.stop();
+        this.sr.buffer = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          let transcript = e.results[i][0].transcript;
+          if (e.results[i].isFinal) {
+            // センテンス終了（認識確定）
+            this.sendPayload(transcript, 'speech');
+          } else {
+            // 認識の途中までバッファにいれておく（そのうち使う）
+            this.sr.buffer = transcript;
+          }
+        }
+      }
+      // 認識終了したらもう一度開始させる
+      // continuous=true のため基本的にずっと認識しっぱなしだが黙ってるとそのうち止まってしまう
+      this.sr.obj.onend = () => {
+        if (this.sr.obj) this.sr.obj.start();
+      }
+    },
+
+    // 文字起こし終了
+    clearSpeechRecognition() {
+      if (this.sr.available && this.sr.obj) {
+        this.sr.obj.stop();
+        this.sr.obj = null;
+        this.sr.buffer = '';
+      }
+    },
+
     // SkyWay:ルームに参加する
     join(meObjectRoom) {
       this.skywayroom = this.skywaypeer.joinRoom(meObjectRoom.name, {
@@ -192,7 +253,7 @@ export default {
     leave() { this.sendPayload(this.me.name+'さんが退室しました', 'system'); this.skywayroom.close() },
 
     sendPayload: function(message, type = 'user') {
-      // type = user/system/speak/qr
+      // type = user/system/speech/qr
       const payloadObject = {
         id: this.$store.state.me.id,
         name: this.$store.state.me.name,

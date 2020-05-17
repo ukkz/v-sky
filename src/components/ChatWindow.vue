@@ -14,18 +14,25 @@
       <v-card-text ref="message_area" style="height:90vh;" class="px-2">
         <v-list subheader style="background-color:transparent;" class="pt-2 mb-10">
 
-          <!-- 基本CSSはmessageクラス・自分のみmessage-meクラス追加 -->
-          <v-list-item v-for="(payload, index) in chat_payloads" :key="index" class="px-0 message" :class="{ 'message-me': (payload.id == me.id && payload.type == 'user') }">
-            <v-avatar v-if="payload.type == 'system'" color="red" size="36" class="mx-1"><v-icon dark>mdi-robot</v-icon></v-avatar>
-            <v-avatar v-else-if="!payload.icon" color="indigo" size="36" class="mx-1"><v-icon dark>mdi-account-circle</v-icon></v-avatar>
-            <v-avatar v-else size="36" class="mx-1"><img :src="payload.icon"></v-avatar>
+          <!-- 基本CSSはmessageクラス・システム以外の自分発のみmessage-meクラス追加 -->
+          <v-list-item v-for="(mes, index) in messages" :key="index" class="px-0 message" :class="{ 'message-me': (mes.id == me.id && mes.type != 'system') }">
+            <v-avatar v-if="mes.type == 'system'" color="red" size="36" class="mx-1"><v-icon dark>mdi-robot</v-icon></v-avatar>
+            <v-avatar v-else-if="!mes.icon" color="indigo" size="36" class="mx-1"><v-icon dark>mdi-account-circle</v-icon></v-avatar>
+            <v-avatar v-else size="36" class="mx-1"><img :src="mes.icon"></v-avatar>
             <v-list-item-content class="my-n2">
-              <v-list-item-subtitle class="name">{{ (payload.type == 'user') ? payload.name : 'V-Bot' }}</v-list-item-subtitle>
+
+              <!-- システムメッセージのみV-Bot・それ以外はユーザー名 -->
+              <v-list-item-subtitle class="name">{{ (mes.type == 'system') ? 'V-Bot' : mes.name }}</v-list-item-subtitle>
 
               <!-- メッセージ本文 -->
               <v-list-item-title class="frame">
-                <div v-if="payload.type == 'user'" class="body text-wrap pa-2 green accent-1">{{ payload.body }}</div>
-                <div v-else class="body text-wrap pa-2 cyan lighten-3" >{{ payload.body }}</div>
+                <!-- ユーザメッセージ（文字起こし・QR含）は薄緑色 -->
+                <div v-if="mes.type == 'user'" class="body text-wrap pa-2 green accent-1">{{ mes.body }}</div>
+                <!-- システムメッセージは薄青色 -->
+                <div v-else class="body text-wrap pa-2 cyan lighten-3" >
+                  <span v-if="mes.type == 'speech'" style="color:gray;">[自動入力] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
+                  <span v-else>{{ mes.body }}</span>
+                </div>
               </v-list-item-title>
 
             </v-list-item-content>
@@ -65,7 +72,7 @@ export default {
       type: Object,
       required: true,
     },
-    chat_payloads: {
+    messages: {
       type: Array,
       required: true,
     },
@@ -98,7 +105,7 @@ export default {
   },
 
   watch: {
-    chat_payloads(state) {
+    messages(state) {
       // チャット配列が変化したらメッセージエリアを最下部までスクロールさせる
       if (this.$refs.message_area) {
         // 最初はDOMが生成されておらずmessage_areaがundefinedになる
