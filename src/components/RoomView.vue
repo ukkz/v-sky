@@ -10,8 +10,8 @@
       </v-list-item-content>
       <!-- チャットオープンボタン -->
       <v-list-item-action>
-        <v-btn v-if="$vuetify.breakpoint.smAndDown" fab depressed small color="green accent-3" @click.stop="chat_dialog = true"><v-icon>mdi-message-text</v-icon></v-btn>
-        <v-btn v-else rounded depressed color="green accent-3" @click.stop="chat_dialog = true"><v-icon>mdi-message-text</v-icon>チャット</v-btn>
+        <v-btn v-if="$vuetify.breakpoint.smAndDown" fab depressed small color="green accent-3" @click.stop="chat_open = true"><v-icon>mdi-message-text</v-icon></v-btn>
+        <v-btn v-else rounded depressed color="green accent-3" @click.stop="chat_open = true"><v-icon>mdi-message-text</v-icon>チャット</v-btn>
       </v-list-item-action>
       <!-- 退室ボタン -->
       <v-list-item-action>
@@ -42,60 +42,22 @@
       </v-container>
     </v-item-group>
 
-    <!-- チャットダイアログ -->
-    <v-dialog v-model="chat_dialog" max-width="640" scrollable>
-      <v-card style="background-color:rgba(255,255,255,0.7); overflow:hidden;">
-
-        <v-card-title class="pt-3">チャット</v-card-title>
-        <v-divider></v-divider>
-
-        <v-card-text ref="message_area" style="height:70vh;">
-          <v-list subheader style="background-color:transparent;">
-
-            <!-- 基本CSSはmessageクラス・自分のみmessage-meクラス追加 -->
-            <v-list-item v-for="(payload, index) in chat_payloads" :key="index" class="px-0 message" :class="{ 'message-me': (payload.id == me.id && payload.type == 'user') }">
-              <v-avatar v-if="payload.type == 'system'" color="red" size="36" class="mx-1"><v-icon dark>mdi-robot</v-icon></v-avatar>
-              <v-avatar v-else-if="!payload.icon" color="indigo" size="36" class="mx-1"><v-icon dark>mdi-account-circle</v-icon></v-avatar>
-              <v-avatar v-else size="36" class="mx-1"><img :src="payload.icon"></v-avatar>
-              <v-list-item-content class="my-n2">
-                <v-list-item-subtitle class="name">{{ (payload.type == 'user') ? payload.name : 'V-Bot' }}</v-list-item-subtitle>
-
-                <!-- メッセージ本文 -->
-                <v-list-item-title class="frame">
-                  <div v-if="payload.type == 'user'" class="body pa-2 green accent-1">{{ payload.body }}</div>
-                  <div v-else class="body pa-2 cyan lighten-3" >{{ payload.body }}</div>
-                </v-list-item-title>
-
-              </v-list-item-content>
-            </v-list-item>
-
-          </v-list>
-          <!-- スペーサー（これがないと最下部までスクロールしても入力部分で余白が出てしまう） -->
-          <v-row style="height:5%;"></v-row>
-        </v-card-text>
-
-        <v-divider></v-divider>
-
-        <!-- 送信フォーム -->
-        <v-row class="pa-2" dense>
-          <v-col cols="10" sm="11" class="mb-n6">
-            <v-text-field autofocus dense outlined solo flat single-line v-model="my_message" label="Enterで送信" @keydown.enter="sendMessage"></v-text-field>
-          </v-col>
-          <v-col cols="2" sm="1">
-            <v-btn fab depressed small color="green accent-3" @click="sendMessage"><v-icon>mdi-send</v-icon></v-btn>
-          </v-col>
-        </v-row>
-
-      </v-card>
-    </v-dialog>
+    <!-- :showで開く・toggleイベント受信で閉じる・sendイベント受信でメッセージ送信&チャット配列反映・反映後のチャット配列はそのままpropsで渡す -->
+    <ChatWindow :show="chat_open" v-on:toggle="chat_open=$event" :me="me" :chat_payloads="chat_payloads" v-on:send="sendPayload($event)" />
 
   </v-card>
+
 </template>
 
 
 <script>
+import ChatWindow from '@/components/ChatWindow.vue';
+
 export default {
   name: 'RoomView',
+  components: {
+    ChatWindow,
+  },
 
   props: {
     me: {
@@ -117,9 +79,8 @@ export default {
       develop_mode: (process.env.NODE_ENV == 'development'),
       skywayroom: null,
       streams: {},
-      chat_dialog: false,
-      my_message: '',
       // chat内をpeerの要素リンクにすると退室したら参照できなくなるので注意
+      chat_open: false,
       chat_payloads: [],
     }
   },
@@ -230,17 +191,6 @@ export default {
     // 実際に退出したあとon.closeの発火でStreamsをクリアし退室した情報をsyncする
     leave() { this.sendPayload(this.me.name+'さんが退室しました', 'system'); this.skywayroom.close() },
 
-    // メッセージ送信（ダイアログ内のボタンなどから発火）
-    sendMessage: function(e) {
-      // エンター送信時の日本語変換Enterの229は無視（通常は13）
-      if (e instanceof KeyboardEvent && e.keyCode == 229) return;
-      // 空文字は無視 / WIP 空白のみなどを正規表現でここで排除する
-      if (!this.my_message) return;
-      // チャット送信処理
-      this.sendPayload(this.my_message, 'user');
-      this.my_message = '';
-    },
-
     sendPayload: function(message, type = 'user') {
       // type = user/system/speak/qr
       const payloadObject = {
@@ -259,13 +209,7 @@ export default {
     // チャット発言追加
     addChat: function(payloadObject) {
       if (!payloadObject.body) return;
-      // type = user/system/speak/qr
       this.chat_payloads.push(payloadObject);
-      // メッセージエリアを最下部までスクロールさせる
-      if (this.$refs.message_area) {
-        const scroll_size = this.$refs.message_area.scrollHeight;
-        this.$refs.message_area.scrollTo(0, scroll_size);
-      }
     },
   },
 }
@@ -286,20 +230,5 @@ export default {
   top:10px;left:10px;
   color:white;
   text-shadow:1px 1px 3px black;
-}
-
-// メッセージ全体
-.message {  }
-.message .frame { overflow:visible; }
-.message .frame div.body {
-  display: inline-block;
-  box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.5);
-  border-radius: 0 20px 20px 20px;
-}
-// 以下は自分発のみ
-.message-me { flex-flow: row-reverse; text-align: end; }
-.message-me .frame div.body {
-  box-shadow: -2px 2px 2px rgba(0, 0, 0, 0.5);
-  border-radius: 20px 0 20px 20px;
 }
 </style>
