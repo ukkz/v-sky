@@ -96,14 +96,16 @@ export default {
     }
   },
 
-  // 自分のRoomに名前が入る > v-ifで描画 > createdで実際にルームにjoinする
-  created() {
+  // joinとcloseは親コンポーネント側のv-if/v-elseによる当コンポーネント自体の描画の開始/終了に伴って実施されている
+  // 開始: RoomListでVuexのルーム名を指定のものに設定 > Dashboardで変更検知してv-if=trueでこのコンポーネントを描画 > mounted().SkyWayPeer.join()
+  // 終了: ここでVuexのルーム名を消去 > Dashboardで変更検知してv-if=falseでこのコンポーネントを削除 > beforedestroy().SkyWayRoom.close()
+  mounted() {
     this.join(this.me.room);
     if (this.speech_onoff) this.startSpeechRecognition();
   },
   beforeDestroy() {
     if (this.speech_onoff) this.endSpeechRecognition();
-    this.leave();
+    this.close();
   },
 
   computed: {
@@ -156,13 +158,7 @@ export default {
   watch: {
     // 自分のストリームが変更された場合に更新する
     mystream(newstream) {
-      if (this.skywaypeer && this.skywayroom) {
-        // 送信しているストリームを付け替える
-        this.skywayroom.replaceStream(newstream);
-        // 画面上のストリームを一旦消して新しいものを追加する
-        this.removeStream(this.skywaypeer.id);
-        this.addMyStream(this.mystream);
-      }
+      if (this.skywaypeer && this.skywayroom) this.replaceStream(newstream);
     },
     // グローバル設定値変更検知：音声認識
     speech_onoff(current, previous) {
@@ -227,43 +223,65 @@ export default {
     },
 
     // SkyWay:ルームに参加する
-    join(meObjectRoom) {
+    join(meObjectRoom, isReplaceStream = false) {
       this.skywayroom = this.skywaypeer.joinRoom(meObjectRoom.name, {
         mode: meObjectRoom.type,
         stream: this.mystream,
         videoReceiveEnabled: true,
         audioReceiveEnabled: true,
       });
-      // ルーム入室
+      // 自分が入室
       this.skywayroom.on('open', () => {
-        // ルーム内ストリームのリストに自身を追加（空ストリームでもよい）
+        if (isReplaceStream) {
+          // ストリームの置き換え（すでに入室している）
+          const as = this.mystream.getAudioTracks().length;
+          const vs = this.mystream.getVideoTracks().length;
+          if (this.develop_mode) console.log('ストリームの変更: [Video, Audio] = ['+vs+', '+as+']');
+          // 画面上の自ストリームを消す
+          this.removeStream(this.skywaypeer.id);
+        } else {
+          // 入室
+          if (this.develop_mode) console.log('ルーム "' + meObjectRoom.name + '"（' + meObjectRoom.type + '）に入室しました');
+          this.sendPayload(this.me.name+'さんが入室しました', 'system');
+          // 親コンポーネントに通知（Dashboardのsyncを実行させる）
+          this.$emit('roomChange');
+        }
+        // 画面上に自ストリームを追加（空ストリームでもよい）
         this.addMyStream(this.mystream);
-        if (this.develop_mode) console.log('ルーム"' + meObjectRoom.name + '"（' + meObjectRoom.type + '）に入室しました');
-        this.sendPayload(this.me.name+'さんが入室しました', 'system');
-        // 入室通知(sync)はDashboard$watchで行う[WIP]emitで発火させたい
       });
       // 誰かからのストリームを受信したらデータ内の配列に追加する
       this.skywayroom.on('stream', mediaStream => this.addStream(mediaStream));
       // 誰かが退室したらデータからも削除
       this.skywayroom.on('peerLeave', peerId => this.removeStream(peerId));
-      // データ（チャットなど）を受信
-      this.skywayroom.on('data', chat => this.addChat(chat.data) );
+      // 誰かからデータ（チャットなど）を受信
+      this.skywayroom.on('data', chat => this.addChat(chat.data));
       // 自分が退室（closeメソッド使用後に自動で発火）
       this.skywayroom.on('close', () => {
-        if (this.develop_mode) console.log('ルーム"' + meObjectRoom.name + '"（' + meObjectRoom.type + '）から退室しました');
+        if (this.develop_mode) console.log('ルーム "' + meObjectRoom.name + '"（' + meObjectRoom.type + '）から退室しました');
         this.removeAllStreams();
         this.skywayroom = null;
-        // 退室通知(sync)はDashboard$watchで行う[WIP]emitで発火させたい
+        // 親コンポーネントに通知（Dashboardのsyncを実行させる）
+        this.$emit('roomChange');
       });
+    },
+
+    // SkyWay:ストリームを更新する
+    replaceStream(newstream) {
+      // openイベント・closeイベントを一時的に解除してからルームからストリームを抜く
+      this.skywayroom.removeAllListeners('open').removeAllListeners('close').close();
+      // 再入室する（ただしisReplaceStreamフラグのため通知チャットなどは送らない）
+      // イベントは以下で再設定される
+      this.join(this.me.room, true);
     },
 
     // SkyWay:ルームから退出する
     // 退出前にチャットを送っておく
-    // 実際に退出したあとon.closeの発火でStreamsをクリアし退室した情報をsyncする
-    leave() { this.sendPayload(this.me.name+'さんが退室しました', 'system'); this.skywayroom.close() },
+    // このあとcloseイベントが発火してそのハンドラ内で実際に退出となる
+    close() { this.sendPayload(this.me.name+'さんが退室しました', 'system'); this.skywayroom.close() },
 
+    // データ全般の送信
+    // type = user/system/speech/qr
     sendPayload: function(message, type = 'user') {
-      // type = user/system/speech/qr
       const payloadObject = {
         id: this.$store.state.me.id,
         name: this.$store.state.me.name,

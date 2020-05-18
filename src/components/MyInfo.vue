@@ -141,7 +141,7 @@ export default {
       ],
       selectedAudio: '',
       selectedVideo: '',
-      local_media_stream: new MediaStream(), // 直接変更禁止
+      local_media_stream: (new MediaStream()), // 直接変更禁止
       audio_muted: false,
       video_muted: false,
       speech_available: false,
@@ -186,7 +186,7 @@ export default {
     onChangeLocalDevice: async function() {
       // 映像デバイスの細かな指定
       let constraint_video;
-      if (this.selectedVideo) {
+      if (this.selectedVideo && !this.video_muted) {
         // facingModeによる指定
         if (this.selectedVideo == 'environment') constraint_video = { facingMode: { exact: 'environment' } };
         else if (this.selectedVideo == 'user') constraint_video = { facingMode: 'user' };
@@ -198,7 +198,7 @@ export default {
       }
       // デバイス指定（どっちもfalseだとだめらしい）
       const constraints = {
-        audio: (this.selectedAudio) ? { deviceId: this.selectedAudio } : false,
+        audio: (this.selectedAudio && !this.audio_muted) ? { deviceId: this.selectedAudio } : false,
         video: constraint_video,
       };
       // ストリームは空白状態では何も送信しない（受信専用ピアになる）
@@ -210,11 +210,8 @@ export default {
         if (e instanceof DOMException) alert('デバイスの利用が許可されませんでした。メディアは受信専用でテキスト送受信のみ可能となります。');
         if (e instanceof OverconstrainedError) alert('指定のカメラはこの端末では利用できません。別のカメラを選択してください。');
       } finally {
-        // ストリームを設定
+        // ストリームを設定（ルーム接続中なら自動でreplaceされる）
         this.setLocalMediaStream(mystream);
-        // ミュート状態を維持
-        this.local_media_stream.getAudioTracks().forEach(track => track.enabled = !this.audio_muted);
-        this.local_media_stream.getVideoTracks().forEach(track => track.enabled = !this.video_muted);
         // ビデオエリアの横幅を取得する
         const video_tracks = mystream.getVideoTracks();
         const video_element_dashboard = document.getElementById('my-video-dashboard');
@@ -344,9 +341,9 @@ export default {
 
   watch: {
     // 映像・音声のミュート
-    video_muted: function(state) { this.local_media_stream.getVideoTracks().forEach(track => track.enabled = !state) },
+    video_muted: function(state) { this.onChangeLocalDevice() },
     audio_muted: function(state) {
-      this.local_media_stream.getAudioTracks().forEach(track => track.enabled = !state);
+      this.onChangeLocalDevice();
       // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
       if (state) this.speech_onoff = false;
     },

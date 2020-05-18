@@ -3,7 +3,7 @@
 
     <!-- サブ部：入室時はshrinkして簡易表示（高さ縮小） -->
     <v-row ref="sub" justify="center" class="my-n5">
-      <MyInfo :me="me" v-on:changeStream="local_media_stream = $event" :shrink="(current_room.name) ? true : false" />
+      <MyInfo :me="me" v-on:changeStream="setLocalMediaStream($event)" :shrink="(current_room.name) ? true : false" />
     </v-row>
 
     <!-- メイン部：高さ自動調整（ルーム内自動レイアウト用） -->
@@ -15,7 +15,7 @@
       </v-col>
       <!-- ルームに入っているとき：ルーム内表示 -->
       <v-col v-if="current_room.name" cols="12">
-        <RoomView :me="me" :mystream="local_media_stream" :skywaypeer="skyway.peer" :peers="peers" />
+        <RoomView :me="me" :mystream="local_media_stream" :skywaypeer="skyway.peer" :peers="peers" v-on:roomChange="sync" />
       </v-col>
 
       <!-- ピア一覧を表示 -->
@@ -48,7 +48,7 @@ export default {
     return {
       develop_mode: (process.env.NODE_ENV == 'development'),
       // メディア
-      local_media_stream: '',
+      local_media_stream: (new MediaStream()), // 直接変更禁止
       skyway: {
         apikey: process.env.VUE_APP_SKYWAY_APIKEY,
         peer: null,
@@ -196,6 +196,9 @@ export default {
       });
       if (this.develop_mode) console.log(cnt + '件のピアにsync送信しました :', this.current_room);
     },
+
+    // 自分のメディアストリームの設定と削除
+    setLocalMediaStream(stream) { this.$set(this, 'local_media_stream', stream) },
   },
 
   computed: {
@@ -244,8 +247,6 @@ export default {
   watch: {
     // ログアウト状態になったときのみログインページへ飛ばす
     jump_when_logged_out(newValue, oldValue) { if (!newValue) this.$router.push({ name: 'Login' }) },
-    // 自分の部屋情報が変化したら他のPeerに通知する
-    current_room(newroom) { this.sync() },
   },
 }
 </script>
