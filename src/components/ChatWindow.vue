@@ -30,7 +30,7 @@
                 <div v-if="mes.type == 'user'" class="body text-wrap pa-2 green accent-1">{{ mes.body }}</div>
                 <!-- システムメッセージは薄青色 -->
                 <div v-else class="body text-wrap pa-2 cyan lighten-3" >
-                  <span v-if="mes.type == 'speech'" style="color:gray;">[自動入力] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
+                  <span v-if="mes.type == 'speech'" style="color:gray;">[音声認識入力] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
                   <span v-else>{{ mes.body }}</span>
                 </div>
               </v-list-item-title>
