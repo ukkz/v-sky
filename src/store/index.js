@@ -25,9 +25,6 @@ export default new Vuex.Store({
       speech_recognition: false,
     },
     in_line_app: false,
-    // メディアストリーム
-    local_media_stream: null,
-    remote_streams: {},
     // skyway共通クラス
     skyway: {
       peer: '',
@@ -70,28 +67,6 @@ export default new Vuex.Store({
 
     setIsInLineApp(state, tf) { state.in_line_app = tf },
 
-    // 自分のメディアストリームの設定と削除
-    setLocalMediaStream(state, stream) {
-      // 以前のストリームが存在する場合は破棄してから新しくセットする
-      this.commit('destroyLocalMediaStream');
-      state.local_media_stream = stream;
-    },
-    destroyLocalMediaStream(state) {
-      if (state.local_media_stream) {
-        state.local_media_stream.getTracks().forEach(track => {
-          // 存在するトラックを1つずつ停止してから削除する（必要ないかも？）
-          track.stop();
-          state.local_media_stream.removeTrack(track);
-        });
-      }
-      state.local_media_stream = null;
-    },
-
-    // ルーム内のStreamの追加・削除
-    addRemoteStream(state, mediaStreamObject) { Vue.set(state.remote_streams, mediaStreamObject.peerId, mediaStreamObject) },
-    removeRemoteStream(state, remoteId) { Vue.delete(state.remote_streams, remoteId) },
-    removeAllRemoteStreams(state) { Vue.set(state, 'remote_streams', {}) },
-
     // ピア状態を更新
     updatePeer(state, meObject) { Vue.set(state.peers, meObject.id, meObject) },
     removePeer(state, pid) { Vue.delete(state.peers, pid) },
@@ -129,8 +104,6 @@ export default new Vuex.Store({
 
     // ログアウト操作
     async logout(context) {
-      // ストリーム停止（カメラとマイクを切る）
-      context.commit('destroyLocalMediaStream');
       // LINEのログイン状態を確認
       await liff.init({
         liffId: process.env.VUE_APP_LIFF_ID

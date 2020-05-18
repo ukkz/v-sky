@@ -6,7 +6,7 @@
       <v-row justify="center" align="center" dense>
         <v-col cols="auto" class="ma-2" v-show="!shrink">
           <v-responsive>
-            <video id="my-video-dashboard" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
+            <video id="my-video-dashboard" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
             <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
               <canvas id="my-wave-dashboard" style="width:100%;height:100%;"></canvas>
             </div>
@@ -63,7 +63,7 @@
 
           <v-col cols="6">
             <v-responsive>
-              <video id="my-video-dialog" :srcObject.prop="$store.state.local_media_stream" muted autoplay playsinline></video>
+              <video id="my-video-dialog" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
               <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
                 <canvas id="my-wave-dialog" style="width:100%;height:100%;"></canvas>
               </div>
@@ -104,14 +104,14 @@ export default {
   name: 'MyInfo',
 
   props: {
+    me: {
+      type: Object,
+      required: true,
+    },
     shrink: {
       type: Boolean,
       required: false,
       default: false,
-    },
-    me: {
-      type: Object,
-      required: true,
     },
   },
 
@@ -141,6 +141,7 @@ export default {
       ],
       selectedAudio: '',
       selectedVideo: '',
+      local_media_stream: new MediaStream(), // 直接変更禁止
       audio_muted: false,
       video_muted: false,
       speech_available: false,
@@ -201,19 +202,21 @@ export default {
         video: constraint_video,
       };
       // ストリームは空白状態では何も送信しない（受信専用ピアになる）
-      let mystream = '';
+      let mystream = new MediaStream();
       try {
         mystream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (e) {
-        if (e instanceof TypeError) alert('映像入力と音声入力を両方とも使用しない場合、メディアは受信専用でテキスト送受信のみ可能となります。');
+        if (e instanceof TypeError) console.log('いずれのMediaも有効になっていないため受信専用モードになりました');
         if (e instanceof DOMException) alert('デバイスの利用が許可されませんでした。メディアは受信専用でテキスト送受信のみ可能となります。');
         if (e instanceof OverconstrainedError) alert('指定のカメラはこの端末では利用できません。別のカメラを選択してください。');
-        console.log('デバイス選択エラー:', e);
       } finally {
-        // ストリームをセット（すでにルーム接続状態であれば自動でreplaceしてくれる・Vuexのmutationを参照）
-        this.$store.commit('setLocalMediaStream', mystream);
+        // ストリームを設定
+        this.setLocalMediaStream(mystream);
+        // ミュート状態を維持
+        this.local_media_stream.getAudioTracks().forEach(track => track.enabled = !this.audio_muted);
+        this.local_media_stream.getVideoTracks().forEach(track => track.enabled = !this.video_muted);
         // ビデオエリアの横幅を取得する
-        const video_tracks = (mystream) ? mystream.getVideoTracks() : [];
+        const video_tracks = mystream.getVideoTracks();
         const video_element_dashboard = document.getElementById('my-video-dashboard');
         const video_element_dialog    = document.getElementById('my-video-dialog');
         let wave_dashboard_width  = video_element_dashboard.offsetWidth;
@@ -231,6 +234,23 @@ export default {
         this.drawMicWave(mystream, 'my-wave-dashboard', wave_dashboard_width, wave_dashboard_height, 15);
         this.drawMicWave(mystream, 'my-wave-dialog',    wave_dialog_width,    wave_dialog_height,    15);
       }
+    },
+
+    // 自分のメディアストリームの設定と削除
+    setLocalMediaStream(stream) {
+      // 以前のストリームが存在する場合は破棄してから新しくセットする
+      this.destroyLocalMediaStream();
+      this.$set(this, 'local_media_stream', stream);
+      // 親コンポーネントへイベント送出
+      this.$emit('changeStream', this.local_media_stream);
+    },
+    destroyLocalMediaStream() {
+      this.local_media_stream.getTracks().forEach(track => {
+        // 存在するトラックを1つずつ停止してから削除する（必要ないかも？）
+        track.stop();
+        this.local_media_stream.removeTrack(track);
+      });
+      this.$set(this, 'local_media_stream', (new MediaStream()));
     },
 
     // マイク入力波形描画
@@ -308,6 +328,7 @@ export default {
 
     // ログアウトする
     logout: function() {
+      this.destroyLocalMediaStream();
       // store/index.jsのactionsでLINEログアウト処理などを行ったのち状態変数をログアウトに
       this.$store.dispatch('logout');
     },
@@ -323,9 +344,9 @@ export default {
 
   watch: {
     // 映像・音声のミュート
-    video_muted: function(state) { this.$store.state.local_media_stream.getVideoTracks().forEach(track => track.enabled = !state) },
+    video_muted: function(state) { this.local_media_stream.getVideoTracks().forEach(track => track.enabled = !state) },
     audio_muted: function(state) {
-      this.$store.state.local_media_stream.getAudioTracks().forEach(track => track.enabled = !state);
+      this.local_media_stream.getAudioTracks().forEach(track => track.enabled = !state);
       // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
       if (state) this.speech_onoff = false;
     },

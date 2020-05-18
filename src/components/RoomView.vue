@@ -64,6 +64,11 @@ export default {
       type: Object,
       required: true,
     },
+    mystream: {
+      type: MediaStream,
+      required: true,
+      default: (new MediaStream()),
+    },
     skywaypeer: {
       type: Object,
       required: true,
@@ -108,8 +113,6 @@ export default {
       Object.keys(this.peers).forEach(id => { if (this.peers[id].room.name == this.me.room.name) cnt++; });
       return cnt;
     },
-    //
-    mystream() { return this.$store.state.local_media_stream },
     // ストリームの配置オプション
     sm_width() {
       const l = Object.keys(this.streams).length;
@@ -152,7 +155,7 @@ export default {
 
   watch: {
     // 自分のストリームが変更された場合に更新する
-    mystream(newstream, oldstream) {
+    mystream(newstream) {
       if (this.skywaypeer && this.skywayroom) {
         // 送信しているストリームを付け替える
         this.skywayroom.replaceStream(newstream);
