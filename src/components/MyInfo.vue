@@ -212,7 +212,7 @@ export default {
       } finally {
         // ストリームを設定（ルーム接続中なら自動でreplaceされる）
         this.setLocalMediaStream(mystream);
-        // ビデオエリアの横幅を取得する
+        // ビデオエリアの幅と高さを暫定的に取得する
         const video_tracks = mystream.getVideoTracks();
         const video_element_dashboard = document.getElementById('my-video-dashboard');
         const video_element_dialog    = document.getElementById('my-video-dialog');
@@ -220,9 +220,10 @@ export default {
         let wave_dashboard_height = video_element_dashboard.offsetHeight;
         let wave_dialog_width  = video_element_dialog.offsetWidth;
         let wave_dialog_height = video_element_dialog.offsetHeight;
-        // 縦幅は実際のビデオの有無で計算する（大抵は4:3）
+        // ビデオトラックが有効な場合は高さを計算して再設定する（大抵は4:3）
         if (mystream && video_tracks[0]) {
-          // ビデオトラックがある場合：getSettings()で色々情報がとれる（その他、アスペクト比やフレームレートなど）
+          // getSettings()で色々情報がとれる（その他、アスペクト比やフレームレートなど）
+          // エレメントに対してvideoWidth/videoHeightも利用可
           const video_track = video_tracks[0].getSettings();
           wave_dashboard_height = wave_dashboard_width * video_track.height / video_track.width;
           wave_dialog_height    = wave_dialog_width * video_track.height / video_track.width;

@@ -27,7 +27,14 @@
           <v-col v-for="(stream, peer_id, index) in streams" :key="index" :cols="col_width" :sm="sm_width">
             <v-item>
               <v-responsive class="peer-frame" :aspect-ratio="16/5">
-                <video class="video-stream ma-auto" :srcObject.prop="stream" autoplay playsinline :muted="(peer_id == skywaypeer.id)"></video>
+                <video
+                  class="video-stream ma-auto"
+                  :id="(peer_id == skywaypeer.id) ? 'my-video-element' : peer_id"
+                  :muted="(peer_id == skywaypeer.id)"
+                  :srcObject.prop="stream"
+                  autoplay
+                  playsinline
+                ></video>
                 <div class="peer-icon">
                   <v-avatar color="indigo">
                     <v-icon v-if="!peers[peer_id].icon_url" dark>mdi-account-circle</v-icon>
@@ -102,6 +109,7 @@ export default {
   mounted() {
     this.join(this.me.room);
     if (this.speech_onoff) this.startSpeechRecognition();
+    this.startQR();
   },
   beforeDestroy() {
     if (this.speech_onoff) this.endSpeechRecognition();
@@ -222,6 +230,72 @@ export default {
       }
     },
 
+    // QR認識開始
+    startQR(interval = 10, fps = 5) {
+      const crop_ratio = 0.5; // 1以下、映像中央から元と同一の縦横比の矩形を抜き出す
+      const sd_w = 160;
+      const interval_seconds = 1000 * interval;
+      let buffer, myvideo, begin, delay, orig_w, orig_h, sd_h;
+
+      const loop = async () => {
+        // ---- 処理開始 ----
+        begin = Date.now();
+        // ビデオエレメントを取得する（メディア利用不可ならinterval秒間待って再試行）
+        myvideo = document.getElementById('my-video-element');
+        if (!myvideo || myvideo.readyState == 0) { setTimeout(loop, interval_seconds); return; }
+        // ストリームのオリジナルサイズを取得
+        orig_w = myvideo.videoWidth;
+        orig_h = myvideo.videoHeight;
+        // ストリームのアスペクト比と等しくなるよう認識用バッファキャンバスの高さを計算（幅は先に定義済み）
+        sd_h = sd_w * orig_h / orig_w;
+        // 非表示のバッファキャンバスを用意
+        buffer = document.createElement('canvas').getContext('2d');
+        // 縦横ともにcrop_ratio倍に縮小した矩形を中央部分から取り出してバッファに書く
+        buffer.drawImage(myvideo,
+          orig_w*(1-crop_ratio)/2, orig_h*(1-crop_ratio)/2, // 映像: 開始点
+          orig_w*crop_ratio, orig_h*crop_ratio,             // 映像: クロップする幅と高さ
+          0, 0,                                             // バッファ: 開始点
+          sd_w, sd_h,                                       // バッファ: 貼り付ける幅と高さ（この大きさに拡縮）
+        );
+        // 貼り付けたサイズと同じぶんだけImageDataObjectとして抜き出す
+        const frame = buffer.getImageData(0, 0, sd_w, sd_h);
+        // jsQRに送ってQR検出を試みる
+        const qr = jsQR(frame.data, frame.width, frame.height);
+        if (qr) {
+          // QR検出
+          console.log(qr.data);
+          const qr_img_data_url = await this.generateQRdataURL(qr.data);
+          this.sendPayload(qr.data, 'qr', qr_img_data_url);
+          // interval秒間は検出しない
+          setTimeout(loop, interval_seconds);
+          return;
+        }
+        // ---- 処理ここまで ----
+        // fpsにあわせて次回の描画タイミングをセット
+        delay = 1000/fps - (Date.now() - begin);
+        setTimeout(loop, delay);
+      };
+
+      // 検出の開始
+      loop();
+    },
+
+    // QRコード画像生成
+    generateQRdataURL: async function(data) {
+      // コールバックをawaitableにして待ち受ける
+      const canvas = await (() => {
+        return new Promise((resolve, reject) => {
+          const c = document.createElement('canvas');
+          QRCode.toCanvas(c, data, {
+            margin: 2,
+            scale: 10
+          }, (error, target) => !error ? resolve(target) : reject(error));
+        })
+      })();
+      // データURLに変換（imgタグのsrcに入れる用）
+      return canvas.toDataURL();
+    },
+
     // SkyWay:ルームに参加する
     join(meObjectRoom, isReplaceStream = false) {
       this.skywayroom = this.skywaypeer.joinRoom(meObjectRoom.name, {
@@ -281,13 +355,14 @@ export default {
 
     // データ全般の送信
     // type = user/system/speech/qr
-    sendPayload: function(message, type = 'user') {
+    sendPayload: function(message, type = 'user', additional_data = null) {
       const payloadObject = {
         id: this.$store.state.me.id,
         name: this.$store.state.me.name,
         icon: this.$store.state.me.icon_url,
         type: type,
         body: message,
+        data: additional_data,
       };
       // 送信
       this.skywayroom.send(payloadObject);

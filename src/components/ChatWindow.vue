@@ -11,8 +11,8 @@
 
       <v-divider></v-divider>
 
-      <v-card-text ref="message_area" style="height:90vh;" class="px-2">
-        <v-list subheader style="background-color:transparent;" class="pt-2 mb-10">
+      <v-card-text ref="message_area" style="height:90vh;" class="px-2 pb-0">
+        <v-list subheader style="background-color:transparent;" class="pt-2">
 
           <!-- 基本CSSはmessageクラス・システム以外の自分発のみmessage-meクラス追加 -->
           <v-list-item v-for="(mes, index) in messages" :key="index" class="px-0 message" :class="{ 'message-me': (mes.id == me.id && mes.type != 'system') }">
@@ -26,12 +26,14 @@
 
               <!-- メッセージ本文 -->
               <v-list-item-title class="frame">
-                <!-- ユーザメッセージ（文字起こし・QR含）は薄緑色 -->
+                <!-- 薄緑色:ユーザが直接入力したメッセージのみ -->
                 <div v-if="mes.type == 'user'" class="body text-wrap pa-2 green accent-1">{{ mes.body }}</div>
-                <!-- システムメッセージは薄青色 -->
+                <!-- 薄青色:それ以外のシステムメッセージ -->
                 <div v-else class="body text-wrap pa-2 cyan lighten-3" >
                   <span v-if="mes.type == 'speech'" style="color:gray;">[音声認識入力] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
+                  <span v-else-if="mes.type == 'qr'" style="color:gray;">[QR送信] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
                   <span v-else>{{ mes.body }}</span>
+                  <img v-if="mes.type == 'qr'" :src="mes.data" class="pa-2" />
                 </div>
               </v-list-item-title>
 
@@ -104,15 +106,12 @@ export default {
     },
   },
 
-  watch: {
-    messages(state) {
-      // チャット配列が変化したらメッセージエリアを最下部までスクロールさせる
-      if (this.$refs.message_area) {
-        // 最初はDOMが生成されておらずmessage_areaがundefinedになる
-        const scroll_size = this.$refs.message_area.scrollHeight;
-        this.$refs.message_area.scrollTo(0, scroll_size);
-      }
-    },
+  updated: function() {
+    // チャット配列変化 > 再描画 > スクロールを一番下まで移動させる
+    // 最初はDOMが生成されておらずmessage_areaがundefinedになる
+    if (this.$refs.message_area) {
+      setTimeout(() => this.$refs.message_area.scrollTo(0, this.$refs.message_area.scrollHeight), 100);
+    }
   },
 }
 </script>
@@ -130,6 +129,11 @@ export default {
   text-align: left; // アラビア語などではrightにする（多言語対応後）
   box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.5);
   border-radius: 0 20px 20px 20px;
+}
+.message .frame div.body img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 // 以下は自分発のみ
 .message-me { flex-flow: row-reverse; text-align: end; }
