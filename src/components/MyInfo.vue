@@ -58,7 +58,7 @@
           <v-col cols="6">
             <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" :disabled="video_muted" class="mt-2"></v-select>
             <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" :disabled="audio_muted" class="mt-n2"></v-select>
-            <v-switch v-model="speech_onoff" :disabled="!speech_available" :label="`音声認識：${(!speech_available)?'非対応':(speech_onoff)?'有効':'無効'}`"></v-switch>
+            <v-switch v-model="speech_onoff"  :label="`音声認識：${(!speech_available)?'利用不可':(speech_onoff)?'有効':'無効'}`" :disabled="!speech_available" class="mt-n2"></v-switch>
           </v-col>
 
           <v-col cols="6">
@@ -178,7 +178,7 @@ export default {
   updated: async function() {
     // 音声認識が利用できるかどうか（WebSpeechAPIの対応状況・マイクの利用許可確認）
     window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-    this.speech_available = (await this.mic_allowed() && 'SpeechRecognition' in window);
+    this.speech_available = (await this.mic_allowed() && 'SpeechRecognition' in window && this.local_media_stream.getAudioTracks().length);
   },
 
   methods: {
@@ -334,8 +334,10 @@ export default {
   computed: {
     speech_onoff: {
       get() { return this.$store.state.config.speech_recognition },
-      // 音声認識を変更できるとき ... 音声ミュートしていない または ミュート中に認識機能をオフにする場合
-      set(onoff) { if (!this.audio_muted || (this.audio_muted && !onoff)) this.$store.commit('speechConfig', onoff) },
+      set(onoff) {
+        // 音声トラックがあれば設定に反映させる
+        if (this.local_media_stream.getAudioTracks().length) this.$store.commit('speechConfig', onoff);
+      },
     },
   },
 
