@@ -109,9 +109,10 @@ export default {
   mounted() {
     this.join(this.me.room);
     if (this.speech_onoff) this.startSpeechRecognition();
-    this.startQR();
+    if (this.qr_onoff) this.startQR();
   },
   beforeDestroy() {
+    if (this.qr_onoff && this.develop_mode) console.log('QRコード認識を終了しました'); // destroyでループ関数ごと破棄されるっぽいのでこのままでよい 
     if (this.speech_onoff) this.endSpeechRecognition();
     this.close();
   },
@@ -159,8 +160,10 @@ export default {
           return 6;
       }
     },
-    // グローバル設定値監視：音声認識
-    speech_onoff() { return this.$store.state.config.speech_recognition }
+    // グローバル設定値監視:音声認識
+    speech_onoff() { return this.$store.state.config.speech_recognition },
+    // グローバル設定値監視:QR認識
+    qr_onoff() { return this.$store.state.config.qr_recognition },
   },
 
   watch: {
@@ -168,11 +171,16 @@ export default {
     mystream(newstream) {
       if (this.skywaypeer && this.skywayroom) this.replaceStream(newstream);
     },
-    // グローバル設定値変更検知：音声認識
+    // グローバル設定値変更検知:音声認識
     speech_onoff(current, previous) {
       if (current && !previous) this.startSpeechRecognition(); // 途中でオンにした
       if (!current && previous) this.endSpeechRecognition();   // 途中でオフにした
-    }
+    },
+    // グローバル設定値変更検知:QR認識
+    qr_onoff(current, previous) {
+      if (current && !previous) this.startQR(); // 途中でオンにした
+      // 途中でオフにしたときは自動で停止する
+    },
   },
 
   methods: {
@@ -230,14 +238,22 @@ export default {
       }
     },
 
-    // QR認識開始
+    // QR認識準備
+    // 開始はqr_onoffをtrueにしてからinitQR()実行
+    // 終了はqr_onoffをfalseにする
     startQR(interval = 10, fps = 5) {
+      if (this.develop_mode) console.log('QRコード認識が開始されました');
       const crop_ratio = 0.5; // 1以下、映像中央から元と同一の縦横比の矩形を抜き出す
       const sd_w = 160;
       const interval_seconds = 1000 * interval;
       let buffer, myvideo, begin, delay, orig_w, orig_h, sd_h;
 
       const loop = async () => {
+        // 無効のときはここですぐに出る（繰り返さない）
+        if (!this.qr_onoff) {
+          if (this.develop_mode) console.log('QRコード認識を終了しました');
+          return;
+        }
         // ---- 処理開始 ----
         begin = Date.now();
         // ビデオエレメントを取得する（メディア利用不可ならinterval秒間待って再試行）
@@ -263,7 +279,7 @@ export default {
         const qr = jsQR(frame.data, frame.width, frame.height);
         if (qr) {
           // QR検出
-          console.log(qr.data);
+          if (this.develop_mode) console.log('QRコードを検出しました / データ:', qr.data);
           const qr_img_data_url = await this.generateQRdataURL(qr.data);
           this.sendPayload(qr.data, 'qr', qr_img_data_url);
           // interval秒間は検出しない

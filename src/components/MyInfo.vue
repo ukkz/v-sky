@@ -58,6 +58,7 @@
           <v-col cols="6">
             <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" :disabled="video_muted" class="mt-2"></v-select>
             <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" :disabled="audio_muted" class="mt-n2"></v-select>
+            <v-switch v-model="qr_onoff"      :label="`QR認識：${(!qr_available)?'利用不可':(qr_onoff)?'有効':'無効'}`" :disabled="!qr_available" class="mt-n2"></v-switch>
             <v-switch v-model="speech_onoff"  :label="`音声認識：${(!speech_available)?'利用不可':(speech_onoff)?'有効':'無効'}`" :disabled="!speech_available" class="mt-n2"></v-switch>
           </v-col>
 
@@ -145,6 +146,7 @@ export default {
       audio_muted: false,
       video_muted: false,
       speech_available: false,
+      qr_available: false,
     }
   },
 
@@ -179,6 +181,7 @@ export default {
     // 音声認識が利用できるかどうか（WebSpeechAPIの対応状況・マイクの利用許可確認）
     window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
     this.speech_available = (await this.mic_allowed() && 'SpeechRecognition' in window && this.local_media_stream.getAudioTracks().length);
+    this.qr_available = (await this.cam_allowed() && this.local_media_stream.getVideoTracks().length);
   },
 
   methods: {
@@ -340,11 +343,22 @@ export default {
         if (this.local_media_stream.getAudioTracks().length) this.$store.commit('speechConfig', onoff);
       },
     },
+    qr_onoff: {
+      get() { return this.$store.state.config.qr_recognition },
+      set(onoff) {
+        // 映像トラックがあれば設定に反映させる
+        if (this.local_media_stream.getVideoTracks().length) this.$store.commit('qrConfig', onoff);
+      },
+    },
   },
 
   watch: {
     // 映像・音声のミュート
-    video_muted: function(state) { this.onChangeLocalDevice() },
+    video_muted: function(state) {
+      this.onChangeLocalDevice();
+      // 映像を消したときのみQR認識を連動して無効にする（ミュート解除に連動して有効化はしない）
+      if (state) this.qr_onoff = false;
+    },
     audio_muted: function(state) {
       this.onChangeLocalDevice();
       // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）

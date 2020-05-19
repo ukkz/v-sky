@@ -23,6 +23,7 @@ export default new Vuex.Store({
     config: {
       debug: false,
       speech_recognition: false,
+      qr_recognition: true,
     },
     in_line_app: false,
     // skyway共通クラス
@@ -64,6 +65,7 @@ export default new Vuex.Store({
 
     // その他の設定変更
     speechConfig(state, onoff) { state.config.speech_recognition = onoff },
+    qrConfig(state, onoff) { state.config.qr_recognition = onoff },
 
     setIsInLineApp(state, tf) { state.in_line_app = tf },
 
