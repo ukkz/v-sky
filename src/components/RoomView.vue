@@ -239,7 +239,7 @@ export default {
     },
 
     // QR認識準備
-    // 開始はqr_onoffをtrueにしてからinitQR()実行
+    // 開始はqr_onoffをtrueにしてからstartQR()実行
     // 終了はqr_onoffをfalseにする
     startQR(interval = 10, fps = 5) {
       if (this.develop_mode) console.log('QRコード認識が開始されました');
@@ -268,10 +268,10 @@ export default {
         buffer = document.createElement('canvas').getContext('2d');
         // 縦横ともにcrop_ratio倍に縮小した矩形を中央部分から取り出してバッファに書く
         buffer.drawImage(myvideo,
-          orig_w*(1-crop_ratio)/2, orig_h*(1-crop_ratio)/2, // 映像: 開始点
-          orig_w*crop_ratio, orig_h*crop_ratio,             // 映像: クロップする幅と高さ
-          0, 0,                                             // バッファ: 開始点
-          sd_w, sd_h,                                       // バッファ: 貼り付ける幅と高さ（この大きさに拡縮）
+          orig_w*(1-crop_ratio)/2, orig_h*(1-crop_ratio)/2, // ソース映像: 開始点
+          orig_w*crop_ratio, orig_h*crop_ratio,             // ソース映像: クロップする幅と高さ
+          0, 0,                                             // 貼付先バッファ: 開始点
+          sd_w, sd_h,                                       // 貼付先バッファ: 貼り付ける幅と高さ（この大きさに拡縮）
         );
         // 貼り付けたサイズと同じぶんだけImageDataObjectとして抜き出す
         const frame = buffer.getImageData(0, 0, sd_w, sd_h);
