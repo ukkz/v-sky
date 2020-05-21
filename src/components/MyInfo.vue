@@ -6,10 +6,8 @@
       <v-row justify="center" align="center" dense>
         <v-col cols="auto" class="ma-2" v-show="!shrink">
           <v-responsive>
-            <video id="my-video-dashboard" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
-            <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
-              <canvas id="my-wave-dashboard" style="width:100%;height:100%;"></canvas>
-            </div>
+            <video id="my-video-dashboard" class="selfview" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
+            <div class="miclevel"><canvas id="miclevel-dashboard"></canvas></div>
           </v-responsive>
         </v-col>
         <v-col cols="auto">
@@ -23,7 +21,7 @@
           <v-row justify="center" class="my-2">
             <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
             <v-btn outlined small class="ma-1" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted"><v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>音声</v-btn>
-            <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="config_dialog = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
+            <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="config_dialog_open = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
             <v-btn outlined small class="ma-1" color="pink darken-1" @click="logout"><v-icon>mdi-exit-run</v-icon>ログアウト</v-btn>
           </v-row>
         </v-col>
@@ -32,7 +30,7 @@
 
 
     <!-- 設定ダイアログ（smサイズ以下でフルスクリーン化） -->
-    <v-dialog v-model="config_dialog" max-width="640" :fullscreen="$vuetify.breakpoint.smAndDown">
+    <v-dialog v-model="config_dialog_open" max-width="640" :fullscreen="$vuetify.breakpoint.smAndDown">
       <v-card>
         <v-list-item>
           <v-list-item-avatar color="indigo">
@@ -43,7 +41,7 @@
             <v-list-item-title class="headline">{{ me.name }}</v-list-item-title>
             <v-list-item-subtitle>{{ me.status }}</v-list-item-subtitle>
           </v-list-item-content>
-          <v-btn icon large color="black" @click="config_dialog = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn icon large color="black" @click="config_dialog_open = false"><v-icon>mdi-close</v-icon></v-btn>
         </v-list-item>
 
         <v-divider></v-divider>
@@ -64,10 +62,8 @@
 
           <v-col cols="6">
             <v-responsive>
-              <video id="my-video-dialog" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
-              <div style="position:absolute;top:0px;left:0px;width:100%;height:100%;">
-                <canvas id="my-wave-dialog" style="width:100%;height:100%;"></canvas>
-              </div>
+              <video id="my-video-dialog" class="selfview" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
+              <div class="miclevel"><canvas id="miclevel-dialog"></canvas></div>
             </v-responsive>
           </v-col>
 
@@ -81,16 +77,16 @@
         <!-- フルスクリーン時のみ補助ボタン（閉ボタン） -->
         <v-divider v-if="$vuetify.breakpoint.smAndDown"></v-divider>
         <v-row v-if="$vuetify.breakpoint.smAndDown" class="pa-2" justify="center">
-          <v-btn dark class="ma-2" color="indigo darken-4" @click="config_dialog = false">設定を閉じる</v-btn>
+          <v-btn dark class="ma-2" color="indigo darken-4" @click="config_dialog_open = false">設定を閉じる</v-btn>
         </v-row>
 
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="permission_dialog" max-width="300" persistent>
+    <v-dialog v-model="permission_dialog_open" max-width="300" persistent>
       <v-card>
         <v-card-text class="pt-3" justify="center">
-          <v-btn outlined class="ma-2" color="blue" @click="permission_dialog = false; onChangeLocalDevice();">カメラ・マイクを利用する</v-btn><br>
+          <v-btn outlined class="ma-2" color="blue" @click="permission_dialog_open = false; onChangeLocalDevice();">カメラ・マイクを利用する</v-btn><br>
           ボタンをクリックするとポップアップが表示されますので「許可」をクリックしてください。
         </v-card-text>
       </v-card>
@@ -118,8 +114,8 @@ export default {
 
   data() {
     return {
-      config_dialog: true, // ダイアログは最初に必ず開く
-      permission_dialog: false,
+      config_dialog_open: true, // ダイアログは最初に必ず開く
+      permission_dialog_open: false,
       audio_devices: [
         {
           text: '使用しない',
@@ -145,6 +141,7 @@ export default {
       local_media_stream: (new MediaStream()), // 直接変更禁止
       audio_muted: false,
       video_muted: false,
+      miclevel_abort_flag: false, // 直接変更禁止
       speech_available: false,
       qr_available: false,
     }
@@ -173,7 +170,7 @@ export default {
     } else {
       // 未許可または拒否の場合はとりあえずダイアログを出す
       // このダイアログ内のボタンを明示的に押してonChangeLocalDeviceを発火させる
-      this.permission_dialog = true;
+      this.permission_dialog_open = true;
     }
   },
 
@@ -181,6 +178,7 @@ export default {
     // 音声認識が利用できるかどうか（WebSpeechAPIの対応状況・マイクの利用許可確認）
     window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
     this.speech_available = (await this.mic_allowed() && 'SpeechRecognition' in window && this.local_media_stream.getAudioTracks().length);
+    // QRが利用できるかどうか（ビデオトラックが最低1つあればOK）
     this.qr_available = (await this.cam_allowed() && this.local_media_stream.getVideoTracks().length);
   },
 
@@ -215,25 +213,8 @@ export default {
       } finally {
         // ストリームを設定（ルーム接続中なら自動でreplaceされる）
         this.setLocalMediaStream(mystream);
-        // ビデオエリアの幅と高さを暫定的に取得する
-        const video_tracks = mystream.getVideoTracks();
-        const video_element_dashboard = document.getElementById('my-video-dashboard');
-        const video_element_dialog    = document.getElementById('my-video-dialog');
-        let wave_dashboard_width  = video_element_dashboard.offsetWidth;
-        let wave_dashboard_height = video_element_dashboard.offsetHeight;
-        let wave_dialog_width  = video_element_dialog.offsetWidth;
-        let wave_dialog_height = video_element_dialog.offsetHeight;
-        // ビデオトラックが有効な場合は高さを計算して再設定する（大抵は4:3）
-        if (mystream && video_tracks[0]) {
-          // getSettings()で色々情報がとれる（その他、アスペクト比やフレームレートなど）
-          // エレメントに対してvideoWidth/videoHeightも利用可
-          const video_track = video_tracks[0].getSettings();
-          wave_dashboard_height = wave_dashboard_width * video_track.height / video_track.width;
-          wave_dialog_height    = wave_dialog_width * video_track.height / video_track.width;
-        }
         // 波形表示を開始
-        this.drawMicWave(mystream, 'my-wave-dashboard', wave_dashboard_width, wave_dashboard_height, 15);
-        this.drawMicWave(mystream, 'my-wave-dialog',    wave_dialog_width,    wave_dialog_height,    15);
+        this.drawMicLevel(this.local_media_stream, (this.config_dialog_open) ? 'miclevel-dialog' : 'miclevel-dashboard', 15);
       }
     },
 
@@ -255,7 +236,9 @@ export default {
     },
 
     // マイク入力波形描画
-    drawMicWave: function(stream, canvas_id, canvas_width, canvas_height, fps = 30) {
+    drawMicLevel: function(stream, canvas_id, fps = 30) {
+      // 以前の関数ループを止めるため一度abortフラグを立てる
+      this.miclevel_abort_flag = true;
       // 音声ストリームが存在しない場合は描画しない
       if (!stream || stream.getAudioTracks().length == 0) return;
       //
@@ -274,45 +257,45 @@ export default {
       // 波形表示対象のキャンバス
       const canvas = document.getElementById(canvas_id);
       const ctx = canvas.getContext('2d');
-      canvas.setAttribute("width", canvas_width);
-      canvas.setAttribute("height", canvas_height);
+      const canvas_width = canvas.offsetWidth;
+      const canvas_height = canvas.offsetHeight;
+      canvas.setAttribute('width', canvas_width);
+      canvas.setAttribute('height', canvas_height);
       
       // 描画処理
-      function draw() {
+      let prev_level = 0;
+      // ループ内変数
+      let begin_time, current_level, avg_level, bar_width;
+      // ループ処理を続行させる
+      this.miclevel_abort_flag = false;
+
+      const draw = () => {
         // ---- 処理開始 ----
-        const begin = Date.now();
+        begin_time = Date.now();
+        // 一時的に抜けるときに使う
+        if (this.miclevel_abort_flag) return;
         // データ取得
         analyser.getByteTimeDomainData(dataArray);
         // キャンバスクリア
         ctx.clearRect(0, 0, canvas_width, canvas_height);
-        ctx.fillStyle = 'rgba(200, 200, 200, 0.0)';
-        ctx.fillRect(0, 0, canvas_width, canvas_height);
-        // 波形線
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 1.0)';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 3;
-        ctx.beginPath();
-        const sliceWidth = canvas_width * 1.0 / bufferLength;
-        let x = 0;
-        //
-        for (let i = 0; i < bufferLength; i++) {
-          const level = dataArray[i] / 128.0; // Uint8 = 0 ~ 255
-          const y = level * canvas_height/2;
-          if (i == 0) ctx.moveTo(x, y);
-          else        ctx.lineTo(x, y);
-          x += sliceWidth;          
-        }
-        // 波形描画
-        ctx.lineTo(canvas_width, canvas_height/2);
-        ctx.stroke();
+        // 信号の最大値を取得
+        let max = 0; // 128 ~ 255
+        for (let i = 0; i < bufferLength; i++) { if (dataArray[i] > max) max = dataArray[i]; }
+        current_level = (max / 128.0) - 1;
+        // 前回の値との平均値をだす
+        avg_level = (current_level + prev_level) / 2;
+        prev_level = current_level;
+        // バーの太さは最低10px
+        bar_width = 10 + (canvas_width / 50);
+        // レベルメータを描画
+        ctx.fillStyle = 'rgba(200, 20, 20, 0.7)';
+        ctx.fillRect(0, (1 - avg_level) * canvas_height, bar_width, avg_level * canvas_height);
         // ---- 処理ここまで ----
         // fpsにあわせて次回の描画タイミングをセット
-        const delay = 1000/fps - (Date.now() - begin);
-        setTimeout(draw, delay);
+        setTimeout(draw, (1000/fps - (Date.now() - begin_time)));
       }
       // 描画開始
-      setTimeout(draw, 0);
+      draw();
     },
 
     // カメラ・マイクそれぞれのPermissionがgrantedかどうか
@@ -364,6 +347,11 @@ export default {
       // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
       if (state) this.speech_onoff = false;
     },
+    // 設定ダイアログの開閉
+    config_dialog_open: function(state) {
+      // 現在表示しているほう（ダッシュボードまたはダイアログ）でレベルメータを再表示
+      this.drawMicLevel(this.local_media_stream, (state) ? 'miclevel-dialog' : 'miclevel-dashboard', 15);
+    },
   },
 }
 </script>
@@ -371,13 +359,27 @@ export default {
 
 <style lang="scss">
 #my-video-dashboard {
-  background-color: #A0A0A0;
   height: 10vh;
   width: auto;
+  border-radius: 10px;
 }
 #my-video-dialog {
-  background-color: #A0A0A0;
   width: 100%;
   height: auto;
+  border-radius: 20px;
+}
+video.selfview {
+  background-color: #A0A0A0;
+  transform: scale(-1, 1);
+}
+div.miclevel {
+  position: absolute;
+  top:0px; left:0px;
+  width: 100%;
+  height: 100%;
+}
+div.miclevel canvas {
+  width: 100%;
+  height: 100%;
 }
 </style>
