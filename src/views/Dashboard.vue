@@ -150,7 +150,7 @@ export default {
   // 状態変化に伴うrerender後に発火
   updated() {
     // this.$refs.main の高さを調整する
-    const offset = parseInt(this.$refs.sub.offsetHeight) - 48;
+    const offset = parseInt(this.$refs.sub.offsetHeight) - 38;
     this.style_main.height = 'calc(100% - ' + offset + 'px)';
   },
 

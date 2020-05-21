@@ -1,8 +1,8 @@
 <template>
-  <v-card class="mx-auto" outlined style="height:100%;">
+  <v-card class="mx-auto" outlined style="height:100%;" ref="room_area">
 
     <!-- ルームの情報 -->
-    <v-list-item>
+    <v-list-item ref="info_area">
       <!-- ルーム名 -->
       <v-list-item-content>
         <v-list-item-title class="headline">{{ me.room.name }} [{{ me.room.type.toUpperCase() }}]</v-list-item-title>
@@ -22,27 +22,39 @@
   
     <!-- ストリーム -->
     <v-item-group>
-      <v-container>
-        <v-row dense>
-          <v-col v-for="(stream, peer_id, index) in streams" :key="index" :cols="col_width" :sm="sm_width">
+      <v-container class="pa-0">
+        <v-row justify="center" align="center" no-gutters>
+          <v-col
+            v-for="(stream, peer_id, index) in streams"
+            :key="index"
+            :cols="col_width"
+            :sm="sm_width"
+            class="pa-1"
+            v-bind:style="{
+              'max-height': '100%',
+              height: (($vuetify.breakpoint.smAndDown) ? col_height(col_width) : col_height(sm_width))+'px',
+            }"
+            align-self="center"
+          >
             <v-item>
-              <v-responsive class="peer-frame" :aspect-ratio="16/5">
+              <div class="peer-frame">
                 <video
-                  class="video-stream ma-auto"
+                  class="room-stream"
+                  v-bind:class="{mirror: (peer_id == skywaypeer.id)}"
                   :id="(peer_id == skywaypeer.id) ? 'my-video-element' : peer_id"
                   :muted="(peer_id == skywaypeer.id)"
                   :srcObject.prop="stream"
                   autoplay
                   playsinline
                 ></video>
-                <div class="peer-icon">
-                  <v-avatar color="indigo">
+                <div class="peer-icon pa-2">
+                  <v-avatar :size="($vuetify.breakpoint.smAndDown) ? 20 : 40" color="indigo">
                     <v-icon v-if="!peers[peer_id].icon_url" dark>mdi-account-circle</v-icon>
                     <img v-else :src="peers[peer_id].icon_url">
                   </v-avatar>
                   <span class="px-2">{{ peers[peer_id].name }}</span>
                 </div>
-              </v-responsive>
+              </div>
             </v-item>
           </v-col>
         </v-row>
@@ -100,6 +112,9 @@ export default {
         obj: null,
         buffer: '',
       },
+      // ルームの初期高さ（mounted時にセットする）
+      // これはマウント中には基本的には変化しない
+      initial_room_height: 0,
     }
   },
 
@@ -110,6 +125,8 @@ export default {
     this.join(this.me.room);
     if (this.speech_onoff) this.startSpeechRecognition();
     if (this.qr_onoff) this.startQR();
+    // ストリームエレメントが利用可能なルーム内の高さ制限（このあと自ストリームがルームに追加されたら1回だけ更新する）
+    this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
   },
   beforeDestroy() {
     if (this.qr_onoff && this.develop_mode) console.log('QRコード認識を終了しました'); // destroyでループ関数ごと破棄されるっぽいのでこのままでよい 
@@ -188,6 +205,16 @@ export default {
     addMyStream: function(mediaStreamObject) { if (mediaStreamObject) { mediaStreamObject['peerId'] = this.skywaypeer.id; this.addStream(mediaStreamObject) } },
     removeStream: function(target_id) { this.$delete(this.streams, target_id) },
     removeAllStreams: function() { this.$set(this, 'streams', {}) },
+
+    // colsの個数とcontainerの高さから段数を求めてcols1つあたりの高さを出す
+    col_height(col_width) {
+      // ストリーム数（参加ユーザー数）
+      const l = Object.keys(this.streams).length;
+      // ストリームの段数（col_widthはpxでなくブレイクポイントのグリッド幅数、12が全幅）
+      const rows = (col_width > 0) ? Math.ceil(l / (12 / col_width)) : 1;
+      // ルームの高さを必要段数で割る
+      return Math.floor(this.initial_room_height / rows);
+    },
 
     // 文字起こし開始
     startSpeechRecognition() {
@@ -335,6 +362,8 @@ export default {
           this.sendPayload(this.me.name+'さんが入室しました', 'system');
           // 親コンポーネントに通知（Dashboardのsyncを実行させる）
           this.$emit('roomChange');
+          // ルームの高さを更新する（これ以降変更させない）
+          this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
         }
         // 画面上に自ストリームを追加（空ストリームでもよい）
         this.addMyStream(this.mystream);
@@ -397,18 +426,29 @@ export default {
 
 
 <style lang="scss">
-.video-stream {
-  background-color: #A0A0A0;
-  //width: 100%;
-  //height: auto;
-}
-.peer-frame {
+div.peer-frame {
+  background-color: #010101;
+  position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
+  border-radius: 30px;
 }
-.peer-icon {
-  position:absolute;
-  top:10px;left:10px;
-  color:white;
-  text-shadow:1px 1px 3px black;
+video.room-stream {
+  background-color: #010101;
+  position: absolute;
+  width: auto;
+  height: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+video.mirror {
+  transform: translateX(-50%) scale(-1, 1) ;
+}
+div.peer-icon {
+  position: absolute;
+  top:5px; left:5px;
+  color: white;
+  text-shadow: 1px 1px 3px black;
 }
 </style>
