@@ -14,7 +14,9 @@
         <v-btn outlined small color="secondary" disabled>{{ room_info.type }}</v-btn>
       </v-list-item-content>
       <v-list-item-action>
-        <v-btn rounded color="primary" @click="$store.dispatch('setMyRoom', {name: room_name, type: room_info.type})"><v-icon>mdi-account-arrow-right</v-icon>入室</v-btn>
+        <v-btn rounded color="primary"
+          @click="$store.dispatch('setMyRoom', {name: room_name, type: room_info.type})"
+        ><v-icon>mdi-account-arrow-right</v-icon>入室</v-btn>
       </v-list-item-action>
     </v-list-item>
 
@@ -30,17 +32,20 @@
       <v-list-item-action>
         <v-tooltip v-if="new_room.is_mesh" bottom>
           <template v-slot:activator="{ on }">
-            <v-btn outlined small color="success" @click="new_room.is_mesh = false" v-on="on">MESH</v-btn>
+            <v-btn outlined small color="green darken-2" @click="new_room.is_mesh = false" v-on="on">MESH</v-btn>
           </template>
           <span>すべてのピアと直接暗号化通信します。<br>ネットワーク負荷が高いため、同時入室は4人程度までにしてください。</span>
         </v-tooltip>
         <v-tooltip v-else bottom>
           <template v-slot:activator="{ on }">
-            <v-btn outlined small color="warning" @click="new_room.is_mesh = true" v-on="on">SFU</v-btn>
+            <v-btn outlined small color="deep-orange accent-3" @click="new_room.is_mesh = true" v-on="on">SFU</v-btn>
           </template>
           <span>SFUサーバーを経由するため途中で暗号化が解除されますが、多人数での利用が可能です。</span>
         </v-tooltip>
-        <v-btn rounded small color="red" @click="$store.dispatch('setMyRoom', {name: new_room.name, type: ((new_room.is_mesh) ? 'mesh' : 'sfu')})" :disabled="!new_room.valid">作成&入室</v-btn>
+        <v-btn rounded small color="red"
+          @click="$store.dispatch('setMyRoom', {name: new_room.name, type: ((new_room.is_mesh) ? 'mesh' : 'sfu')})"
+          :disabled="!new_room.valid"
+        >作成&入室</v-btn>
       </v-list-item-action>
     </v-list-item>
 

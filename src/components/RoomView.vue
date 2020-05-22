@@ -5,7 +5,14 @@
     <v-list-item ref="info_area">
       <!-- ルーム名 -->
       <v-list-item-content>
-        <v-list-item-title class="headline">{{ me.room.name }} [{{ me.room.type.toUpperCase() }}]</v-list-item-title>
+        <v-list-item-title class="headline">
+          {{ me.room.name }}
+          <v-chip
+            :color="(me.room.type == 'mesh') ? 'green darken-2' : 'deep-orange accent-3'"
+            text-color="white"
+            x-small
+          >{{ me.room.type.toUpperCase() }}</v-chip>
+        </v-list-item-title>
         <v-list-item-subtitle>参加数: {{ people_count }}</v-list-item-subtitle>
       </v-list-item-content>
       <!-- チャットオープンボタン -->
