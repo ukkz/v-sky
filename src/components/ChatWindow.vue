@@ -15,8 +15,13 @@
         <v-list subheader style="background-color:transparent;" class="pt-2">
 
           <!-- 基本CSSはmessageクラス・システム以外の自分発のみmessage-meクラス追加 -->
-          <v-list-item v-for="(mes, index) in messages" :key="index" class="px-0 message" :class="{ 'message-me': (mes.id == me.id && mes.type != 'system') }">
-            <v-avatar v-if="mes.type == 'system'" color="red" size="36" class="mx-1"><v-icon dark>mdi-robot</v-icon></v-avatar>
+          <v-list-item
+            v-for="(mes, index) in messages"
+            :key="index"
+            class="px-0 message"
+            :class="{ 'message-me': (mes.id == me.id && mes.type != 'bot') }"
+          >
+            <v-avatar v-if="mes.type == 'bot'" color="red" size="36" class="mx-1"><v-icon dark>mdi-robot</v-icon></v-avatar>
             <v-avatar v-else-if="!mes.icon" color="indigo" size="36" class="mx-1"><v-icon dark>mdi-account-circle</v-icon></v-avatar>
             <v-avatar v-else size="36" class="mx-1"><img :src="mes.icon"></v-avatar>
             <v-list-item-content class="my-n2">
@@ -30,8 +35,8 @@
                 <div v-if="mes.type == 'user'" class="body text-wrap pa-2 green accent-1">{{ mes.body }}</div>
                 <!-- 薄青色:それ以外のシステムメッセージ -->
                 <div v-else class="body text-wrap pa-2 cyan lighten-3" >
-                  <span v-if="mes.type == 'speech'" style="color:gray;">[音声認識入力] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
-                  <span v-else-if="mes.type == 'qr'" style="color:gray;">[QR送信] <span style="font-style:italic;color:black;">{{ mes.body }}</span></span>
+                  <span v-if="mes.type == 'speech'"  class="sp">[音声認識入力] <span>{{ mes.body }}</span></span>
+                  <span v-else-if="mes.type == 'qr'" class="sp">[QR送信] <span>{{ mes.body }}</span></span>
                   <span v-else>{{ mes.body }}</span>
                   <img v-if="mes.type == 'qr'" :src="mes.data" class="pa-2" />
                 </div>
@@ -144,5 +149,13 @@ export default {
 // オーバーライド（テキスト入力部の詳細を表示しないことで高さを削除）
 .message_input_area div.v-text-field__details {
   display: none !important;
+}
+// 特殊メッセージ
+span.sp {
+  color: gray;
+}
+span.sp span {
+  color: black;
+  font-style: italic;
 }
 </style>
