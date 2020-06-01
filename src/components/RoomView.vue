@@ -5,24 +5,31 @@
     <v-list-item ref="info_area">
       <!-- ルーム名 -->
       <v-list-item-content>
+        <!-- ルーム名 -->
         <v-list-item-title class="headline">
           {{ me.room.name }}
+        </v-list-item-title>
+        <!-- 参加人数・ルームタイプ・公開状態 -->
+        <v-list-item-subtitle>
+          <v-chip color="black" class="mr-1" outlined label small><v-icon left>mdi-account</v-icon>{{ people_count }}人</v-chip>
           <v-chip
             :color="(me.room.type == 'mesh') ? 'green darken-2' : 'deep-orange accent-3'"
-            text-color="white"
-            x-small
+            text-color="white" class="mx-1" small
           >{{ me.room.type.toUpperCase() }}</v-chip>
-        </v-list-item-title>
-        <v-list-item-subtitle>参加数: {{ people_count }}</v-list-item-subtitle>
+          <v-chip
+            :color="(is_public === null) ? 'grey' : (is_public === true) ? 'amber darken-2' : 'teal'"
+            text-color="white" class="mx-1" small
+          >{{ (is_public === null) ? '不明' : (is_public === true) ? '公開' : '限定' }}</v-chip>
+        </v-list-item-subtitle>
       </v-list-item-content>
       <!-- チャットオープンボタン -->
       <v-list-item-action>
-        <v-btn v-if="$vuetify.breakpoint.smAndDown" fab depressed small color="green accent-3" @click.stop="chat_open = true"><v-icon>mdi-message-text</v-icon></v-btn>
+        <v-btn v-if="$vuetify.breakpoint.xs" fab depressed small color="green accent-3" @click.stop="chat_open = true"><v-icon>mdi-message-text</v-icon></v-btn>
         <v-btn v-else rounded depressed color="green accent-3" @click.stop="chat_open = true"><v-icon>mdi-message-text</v-icon>チャット</v-btn>
       </v-list-item-action>
       <!-- 退室ボタン -->
       <v-list-item-action>
-        <v-btn v-if="$vuetify.breakpoint.smAndDown" fab depressed small dark color="pink lighten-1" @click="$store.dispatch('clearMyRoom')"><v-icon>mdi-logout</v-icon></v-btn>
+        <v-btn v-if="$vuetify.breakpoint.xs" fab depressed small dark color="pink lighten-1" @click="$store.dispatch('clearMyRoom')"><v-icon>mdi-logout</v-icon></v-btn>
         <v-btn v-else rounded depressed dark color="pink lighten-1" @click="$store.dispatch('clearMyRoom')"><v-icon>mdi-logout</v-icon>退室</v-btn>
       </v-list-item-action>
     </v-list-item>
@@ -32,7 +39,7 @@
       <v-container class="pa-0">
         <v-row justify="center" align="center" no-gutters>
           <v-col
-            v-for="(stream, peer_id, index) in streams"
+            v-for="(stream, id, index) in streams"
             :key="index"
             :cols="col_width"
             :sm="sm_width"
@@ -47,19 +54,19 @@
               <div class="peer-frame">
                 <video
                   class="room-stream"
-                  v-bind:class="{mirror: (peer_id == skywaypeer.id)}"
-                  :id="(peer_id == skywaypeer.id) ? 'my-video-element' : peer_id"
-                  :muted="(peer_id == skywaypeer.id)"
+                  v-bind:class="{mirror: (id == skywaypeer.id)}"
+                  :id="(id == skywaypeer.id) ? 'my-video-element' : id"
+                  :muted="(id == skywaypeer.id)"
                   :srcObject.prop="stream"
                   autoplay
                   playsinline
                 ></video>
                 <div class="peer-icon pa-2">
                   <v-avatar :size="($vuetify.breakpoint.smAndDown) ? 20 : 40" color="indigo">
-                    <v-icon v-if="!peers[peer_id].icon_url" dark>mdi-account-circle</v-icon>
-                    <img v-else :src="peers[peer_id].icon_url">
+                    <img v-if="(id in room_peers) && room_peers[id].icon_url" :src="room_peers[id].icon_url">
+                    <v-icon v-else dark>mdi-account-circle</v-icon>
                   </v-avatar>
-                  <span class="px-2">{{ peers[peer_id].name }}</span>
+                  <span class="px-2">{{ (id in room_peers) ? room_peers[id].name : 'unknown' }}</span>
                 </div>
               </div>
             </v-item>
@@ -69,7 +76,13 @@
     </v-item-group>
 
     <!-- :showで開く・toggleイベント受信で閉じる・sendイベント受信でメッセージ送信&チャット配列反映・反映後のチャット配列はそのままpropsで渡す -->
-    <ChatWindow :show="chat_open" v-on:toggle="chat_open=$event" :me="me" :messages="chat_payloads" v-on:send="sendPayload($event)" />
+    <ChatWindow
+      :show="chat_open"
+      :me="me"
+      :messages="chat_payloads"
+      @toggle="chat_open = $event"
+      @send="sendPayload($event)"
+    />
 
   </v-card>
 
@@ -93,13 +106,8 @@ export default {
     mystream: {
       type: MediaStream,
       required: true,
-      default: (new MediaStream()),
     },
     skywaypeer: {
-      type: Object,
-      required: true,
-    },
-    peers: {
       type: Object,
       required: true,
     },
@@ -108,9 +116,19 @@ export default {
   data() {
     return {
       develop_mode: (process.env.NODE_ENV == 'development'),
+      // Roomオブジェクト
       skywayroom: null,
+      // ルーム内ピアとストリームのリスト（PeerIDがキー名）
+      // ピアは全員分入るがストリームはないこともある
+      room_peers: {},
       streams: {},
-      // chat内をpeerの要素リンクにすると退室したら参照できなくなるので注意
+      // 公開フラグ・入室後の通信で明示的にtrueまたはfalseで設定される
+      // this.me.room.public より ルーム内の通信で共有された公開状態を優先させるため
+      // 先にこのフラグで情報を同期してからmeObjectに反映させる
+      is_public: null,
+      // botによる退室メッセージを送らない ... 再入室の前にtrueにする
+      not_send_my_leaving: false,
+      // chat内をpeerの要素リンクにすると誰かが退室したらその人の過去チャットが参照できなくなるので注意
       chat_open: false,
       chat_payloads: [],
       // 音声認識
@@ -129,7 +147,7 @@ export default {
   // 開始: RoomListでVuexのルーム名を指定のものに設定 > Dashboardで変更検知してv-if=trueでこのコンポーネントを描画 > mounted().SkyWayPeer.join()
   // 終了: ここでVuexのルーム名を消去 > Dashboardで変更検知してv-if=falseでこのコンポーネントを削除 > beforedestroy().SkyWayRoom.close()
   mounted() {
-    this.join(this.me.room);
+    this.join();
     if (this.speech_onoff) this.startSpeechRecognition();
     if (this.qr_onoff) this.startQR();
     // ストリームエレメントが利用可能なルーム内の高さ制限（このあと自ストリームがルームに追加されたら1回だけ更新する）
@@ -142,12 +160,8 @@ export default {
   },
 
   computed: {
-    // このルームに参加している人数（受信専用も含むためストリーム数では数えられない）
-    people_count() {
-      let cnt = 0;      
-      Object.keys(this.peers).forEach(id => { if (this.peers[id].room.name == this.me.room.name) cnt++; });
-      return cnt;
-    },
+    // このルームに参加している人数
+    people_count() { return Object.keys(this.room_peers).length },
     // ストリームの配置オプション
     sm_width() {
       const l = Object.keys(this.streams).length;
@@ -193,7 +207,14 @@ export default {
   watch: {
     // 自分のストリームが変更された場合に更新する
     mystream(newstream) {
-      if (this.skywaypeer && this.skywayroom) this.replaceStream(newstream);
+      // 新しいストリームのトラック数を確認
+      const audio_count = parseInt(newstream.getAudioTracks().length);
+      const video_count = parseInt(newstream.getVideoTracks().length);
+      if (this.develop_mode) console.log('メディアストリーム変更: VideoTracks('+video_count+'), AudioTracks('+audio_count+')');
+      // 再入室フラグを設定してchangeRoomイベントを親コンポーネントに送出
+      this.$store.dispatch('setRejoin');
+      this.not_send_my_leaving = true; // close()で退室メッセージを送らない
+      this.$emit('changeRoom');
     },
     // グローバル設定値変更検知:音声認識
     speech_onoff(current, previous) {
@@ -209,9 +230,10 @@ export default {
 
   methods: {
     addStream: function(mediaStreamObject) { this.$set(this.streams, mediaStreamObject.peerId, mediaStreamObject) },
-    addMyStream: function(mediaStreamObject) { if (mediaStreamObject) { mediaStreamObject['peerId'] = this.skywaypeer.id; this.addStream(mediaStreamObject) } },
+    addMyStream: function() { this.mystream['peerId'] = this.skywaypeer.id; this.addStream(this.mystream) },
     removeStream: function(target_id) { this.$delete(this.streams, target_id) },
-    removeAllStreams: function() { this.$set(this, 'streams', {}) },
+    addPeer: function(meObject) { this.$set(this.room_peers, meObject.id, meObject) },
+    removePeer: function(target_id) { this.removeStream(target_id); this.$delete(this.room_peers, target_id) },
 
     // colsの個数とcontainerの高さから段数を求めてcols1つあたりの高さを出す
     col_height(col_width) {
@@ -219,7 +241,7 @@ export default {
       const l = Object.keys(this.streams).length;
       // ストリームの段数（col_widthはpxでなくブレイクポイントのグリッド幅数、12が全幅）
       const rows = (col_width > 0) ? Math.ceil(l / (12 / col_width)) : 1;
-      // ルームの高さを必要段数で割る
+      // ルームの高さを必要段数で割る（端数切り上げ）
       return Math.floor(this.initial_room_height / rows);
     },
 
@@ -347,71 +369,142 @@ export default {
     },
 
     // SkyWay:ルームに参加する
-    join(meObjectRoom, isReplaceStream = false) {
-      this.skywayroom = this.skywaypeer.joinRoom(meObjectRoom.name, {
-        mode: meObjectRoom.type,
+    join() {
+      // エラー（同名で異なるタイプのルームに入室してしまったとき用）
+      this.skywaypeer.once('error', error => {
+        if (error.type == 'room-error') {
+          if (this.develop_mode) console.log('通信タイプの異なる同名ルームが存在するため再入室します');
+          // ルームタイプ切替・再入室フラグ設定
+          const new_room_type = (this.me.room.type == 'mesh') ? 'sfu' : 'mesh';
+          this.$store.dispatch('setMyRoomType', new_room_type);
+          this.$store.dispatch('setRejoin');
+          // 書き換えたルーム情報で再入室
+          this.$emit('changeRoom');
+          // 親コンポーネント側でdestroyされたあと再mountされる
+        } else {
+          if (this.develop_mode) console.log('未定義エラー:', error);
+        }
+      });
+      // 実際の入室
+      this.skywaypeer.rooms = {};
+      this.skywayroom = this.skywaypeer.joinRoom(this.me.room.name, {
+        mode: this.me.room.type,
         stream: this.mystream,
         videoReceiveEnabled: true,
         audioReceiveEnabled: true,
       });
-      // 自分が入室
-      this.skywayroom.on('open', () => {
-        if (isReplaceStream) {
-          // ストリームの置き換え（すでに入室している）
-          const as = this.mystream.getAudioTracks().length;
-          const vs = this.mystream.getVideoTracks().length;
-          if (this.develop_mode) console.log('ストリームの変更: [Video, Audio] = ['+vs+', '+as+']');
-          // 画面上の自ストリームを消す
-          this.removeStream(this.skywaypeer.id);
-        } else {
-          // 入室
-          if (this.develop_mode) console.log('ルーム "' + meObjectRoom.name + '"（' + meObjectRoom.type + '）に入室しました');
-          this.sendPayload(this.me.name+'さんが入室しました', 'system');
-          // 親コンポーネントに通知（Dashboardのsyncを実行させる）
-          this.$emit('roomChange');
-          // ルームの高さを更新する（これ以降変更させない）
-          this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
+      // シグナリングサーバからログを受信する（入室直後にgetLogを行う）
+      this.skywayroom.once('log', log => {
+        // logは配列になっており自分が最初の入室（= 作成者）のとき配列長は1となる
+        // 自分が作成者であれば公開状態はmeObjectからコピーし必ずtrueかfalseのどちらかになる
+        // 既にルームがある場合は他の参加者から情報をもらうまで公開状態は未確定とする
+        this.is_public = (log.length == 1) ? this.me.room.public : null;
+        // 自分が作成者 かつ 公開設定 かつ 再入室ではない 場合のみ親コンポーネントに通知（Dashboardのsyncを実行し公開ルームを作成・入室したことを全体通知）
+        if (this.is_public === true && this.me.room.rejoin !== true) this.$emit('sync');
+        // dump
+        if (this.develop_mode && this.me.room.rejoin !== true) {
+          if (this.is_public === true)  console.log('公開ルームを新規作成しました');
+          if (this.is_public === false) console.log('限定ルームを新規作成しました');
+          console.log('ルーム "' + this.me.room.name + '"（' + this.me.room.type + '）に入室しました');
+          if (this.is_public === null)  console.log('ルームの公開状態を他のピアから取得します');
         }
+      });
+      // 自分が入室
+      this.skywayroom.once('open', () => {
+        // ピアリストに自身を追加
+        this.addPeer(this.me);
+        // ログ要求によりルームが新規かどうか確認
+        this.skywayroom.getLog();
+        // 入室通知（peerJoinイベントではなくこちらを使う）
+        this.sendPayload('join', 'system', this.me);
+        // 再入室の場合で退避されたチャットがあれば復元する
+        this.$store.state.chat_history.forEach(payloadObject => this.chat_payloads.push(payloadObject));
+        this.$store.commit('clearChatLog');
+        // 自分が入室したことをチャットに送る（ただし再入室の場合は送らない）
+        if (this.me.room.rejoin !== true) this.sendPayload(this.me.name+'さんが入室しました', 'bot');
+        // ストリームの映像枠が利用可能なエリアの高さを更新する（これ以降は変更させない）
+        this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
         // 画面上に自ストリームを追加（空ストリームでもよい）
-        this.addMyStream(this.mystream);
+        this.addMyStream();
       });
       // 誰かからのストリームを受信したらデータ内の配列に追加する
       this.skywayroom.on('stream', mediaStream => this.addStream(mediaStream));
-      // 誰かが退室したらデータからも削除
-      this.skywayroom.on('peerLeave', peerId => this.removeStream(peerId));
+      // 誰かが退室したらピア情報とストリームの両方を削除
+      this.skywayroom.on('peerLeave', peerId => this.removePeer(peerId));
       // 誰かからデータ（チャットなど）を受信
-      this.skywayroom.on('data', chat => this.addChat(chat.data));
-      // 自分が退室（closeメソッド使用後に自動で発火）
-      this.skywayroom.on('close', () => {
-        if (this.develop_mode) console.log('ルーム "' + meObjectRoom.name + '"（' + meObjectRoom.type + '）から退室しました');
-        this.removeAllStreams();
-        this.skywayroom = null;
-        // 親コンポーネントに通知（Dashboardのsyncを実行させる）
-        this.$emit('roomChange');
+      // 引数の中身のdataプロパティがデータ本体
+      this.skywayroom.on('data', payload => {
+        const payloadObject = payload.data;
+        // チャットに追加（システムメッセージは無視される）
+        this.addChat(payloadObject);
+        // 以下はシステムメッセージの場合の処理
+        if (payloadObject.type == 'system') {
+          // 情報種別
+          switch (payloadObject.body) {
+            case 'join': // 入室通知の受信
+              // 対象（新しく入室してきたピア）を新規登録
+              this.addPeer(payloadObject.data);
+              // 自身のmeObjectを返送
+              this.sendPayload('info', 'system', this.me);
+              break;
+            case 'info': // meObject受信
+              // 対象（すでにルームにいたピア）を新規登録または更新
+              this.addPeer(payloadObject.data);
+              // ルームの公開状態が未確定のとき（既存のルームに入室し かつ infoの初回受信）
+              if (this.is_public === null) {
+                // このコンポーネントの公開状態フラグを変更
+                this.is_public = payloadObject.data.room.public;
+                // meObjectのルーム公開状態を変更
+                this.$store.dispatch('setMyRoomIsPublic', this.is_public);
+                // 公開ルーム かつ 再入室ではない 場合のみ親コンポーネントに通知（Dashboardのsyncを実行し公開ルームに入室したことを全体通知）
+                if (this.is_public === true && this.me.room.rejoin !== true) this.$emit('sync');
+                // dump
+                if (this.develop_mode && this.me.room.rejoin !== true) {
+                  if (this.is_public === true)  console.log('"'+this.me.room.name+'" は公開ルームです');
+                  if (this.is_public === false) console.log('"'+this.me.room.name+'" は限定ルームです'); 
+                }
+              }
+              break;
+          }
+        }
       });
     },
 
-    // SkyWay:ストリームを更新する
-    replaceStream(newstream) {
-      // openイベント・closeイベントを一時的に解除してからルームからストリームを抜く
-      this.skywayroom.removeAllListeners('open').removeAllListeners('close').close();
-      // 再入室する（ただしisReplaceStreamフラグのため通知チャットなどは送らない）
-      // イベントは以下で再設定される
-      this.join(this.me.room, true);
+    // SkyWay:ルームから退出する
+    close() {
+      if (this.not_send_my_leaving) {
+        // 一時的な退室（あとですぐ再入室する）
+        // チャットを退避させる
+        this.$store.commit('storeChatLog', this.chat_payloads);
+      } else {
+        // 通常の退室
+        // 自分が退室したことをチャットに送る
+        this.sendPayload(this.me.name+'さんが退室しました', 'bot');
+      }
+      // 自分が退室（closeメソッド使用後に自動で発火）
+      this.skywayroom.once('close', () => {
+        // 親コンポーネントに通知（Dashboardのsyncを実行し公開ルームから退出したことを全体通知）
+        // この関数が発火した時点でVuexのルームオブジェクトは空になっているのでsync送信データは常に未入室となる
+        // 再入室の場合は送らない
+        if (!this.not_send_my_leaving) {
+          this.$emit('sync');
+          if (this.develop_mode) console.log('ルーム "' + this.skywayroom.name + '" から退室しました');
+        }
+      });
+      // このあとon.closeイベントが発火してそのハンドラ内で実際に退出
+      this.skywayroom.close();
     },
 
-    // SkyWay:ルームから退出する
-    // 退出前にチャットを送っておく
-    // このあとcloseイベントが発火してそのハンドラ内で実際に退出となる
-    close() { this.sendPayload(this.me.name+'さんが退室しました', 'system'); this.skywayroom.close() },
-
-    // データ全般の送信
-    // type = user/system/speech/qr
+    // ルーム内におけるデータ全般の送信
+    // type = user/speech/qr/system
+    // type = qr のとき additional_data = [ IMAGE DATA URL ]
+    // type = system のとき message = 'join' / 'info' , additional_data = meObject (this.meと同じ)
     sendPayload: function(message, type = 'user', additional_data = null) {
+      if (!this.skywayroom) return; // ルームタイプ自動切替のときにnullの場合がある
       const payloadObject = {
-        id: this.$store.state.me.id,
-        name: this.$store.state.me.name,
-        icon: this.$store.state.me.icon_url,
+        id: this.me.id,
+        name: this.me.name,
+        icon: this.me.icon_url,
         type: type,
         body: message,
         data: additional_data,
@@ -424,7 +517,8 @@ export default {
 
     // チャット発言追加
     addChat: function(payloadObject) {
-      if (!payloadObject.body) return;
+      // システムメッセージであるか、bodyが空のときは無視する
+      if (payloadObject.type == 'system' || !payloadObject.body) return;
       this.chat_payloads.push(payloadObject);
     },
   },

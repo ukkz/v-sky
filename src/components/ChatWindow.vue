@@ -27,7 +27,7 @@
             <v-list-item-content class="my-n2">
 
               <!-- システムメッセージのみV-Bot・それ以外はユーザー名 -->
-              <v-list-item-subtitle class="name">{{ (mes.type == 'system') ? 'V-Bot' : mes.name }}</v-list-item-subtitle>
+              <v-list-item-subtitle class="name">{{ (mes.type == 'bot') ? 'V-Bot' : mes.name }}</v-list-item-subtitle>
 
               <!-- メッセージ本文 -->
               <v-list-item-title class="frame">

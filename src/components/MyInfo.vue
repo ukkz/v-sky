@@ -4,11 +4,11 @@
     <!-- ダッシュボード上部に常駐する部分 -->
     <v-card outlined>
       <v-row justify="center" align="center" dense>
-        <v-col cols="auto" class="ma-2" v-show="!shrink">
-          <v-responsive>
-            <video id="my-video-dashboard" class="selfview" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
-            <div class="miclevel"><canvas id="miclevel-dashboard"></canvas></div>
-          </v-responsive>
+        <v-col cols="2" class="ma-1" v-show="!shrink">
+          <div id="vf-dashboard" class="vf">
+            <video :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
+            <canvas id="miclevel-dashboard"></canvas>
+          </div>
         </v-col>
         <v-col cols="auto">
           <v-row justify="center" align="center" class="my-2" v-show="!shrink">
@@ -19,10 +19,18 @@
             <h3 class="mx-2">{{ me.name }} さん</h3>
           </v-row>
           <v-row justify="center" class="my-2">
-            <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'" @click="video_muted = !video_muted"><v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>映像</v-btn>
-            <v-btn outlined small class="ma-1" :color="(audio_muted) ? 'grey' : 'green darken-1'" @click="audio_muted = !audio_muted"><v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>音声</v-btn>
-            <v-btn outlined small class="ma-1" color="indigo darken-4" @click.stop="config_dialog_open = true"><v-icon>mdi-account-cog</v-icon>設定</v-btn>
-            <v-btn outlined small class="ma-1" color="pink darken-1" @click="logout"><v-icon>mdi-exit-run</v-icon>ログアウト</v-btn>
+            <v-btn outlined small class="ma-1" :color="(video_muted) ? 'grey' : 'deep-orange darken-2'"
+              @click="video_muted = !video_muted">
+              <v-icon>mdi-video{{ (video_muted ? '-off' : '') }}</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : '映像' }}</v-btn>
+            <v-btn outlined small class="ma-1" :color="(audio_muted) ? 'grey' : 'green darken-1'"
+              @click="audio_muted = !audio_muted">
+              <v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : '音声' }}</v-btn>
+            <v-btn outlined small class="ma-1" color="indigo darken-4"
+              @click.stop="config_dialog_open = true">
+              <v-icon>mdi-cog</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : '設定' }}</v-btn>
+            <v-btn outlined small class="ma-1" color="pink darken-1"
+              @click="logout">
+              <v-icon>mdi-exit-run</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : 'ログアウト' }}</v-btn>
           </v-row>
         </v-col>
       </v-row>
@@ -61,10 +69,10 @@
           </v-col>
 
           <v-col cols="6">
-            <v-responsive>
-              <video id="my-video-dialog" class="selfview" :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
-              <div class="miclevel"><canvas id="miclevel-dialog"></canvas></div>
-            </v-responsive>
+            <div id="vf-dialog" class="vf">
+              <video :srcObject.prop="local_media_stream" muted autoplay playsinline></video>
+              <canvas id="miclevel-dialog"></canvas>
+            </div>
           </v-col>
 
         </v-row>
@@ -256,18 +264,18 @@ export default {
       const dataArray = new Uint8Array(bufferLength);
       // 波形表示対象のキャンバス
       const canvas = document.getElementById(canvas_id);
-      const ctx = canvas.getContext('2d');
-      const canvas_width = canvas.offsetWidth;
-      const canvas_height = canvas.offsetHeight;
+      const parent = canvas.parentNode;
+      const canvas_width = parent.offsetWidth;
+      const canvas_height = 100; // 実際の表示はCSSで親要素100%高に引き延ばされる
       canvas.setAttribute('width', canvas_width);
       canvas.setAttribute('height', canvas_height);
+      // キャンバス操作
+      const ctx = canvas.getContext('2d');
       
       // 描画処理
       let prev_level = 0;
       // ループ内変数
       let begin_time, current_level, avg_level, bar_width;
-      // ループ処理を続行させる
-      this.miclevel_abort_flag = false;
 
       const draw = () => {
         // ---- 処理開始 ----
@@ -294,8 +302,13 @@ export default {
         // fpsにあわせて次回の描画タイミングをセット
         setTimeout(draw, (1000/fps - (Date.now() - begin_time)));
       }
+
       // 描画開始
-      draw();
+      this.$nextTick(() => {
+        // ループ処理を続行させる
+        this.miclevel_abort_flag = false;
+        draw();
+      });
     },
 
     // カメラ・マイクそれぞれのPermissionがgrantedかどうか
@@ -358,27 +371,33 @@ export default {
 
 
 <style lang="scss">
-#my-video-dashboard {
+div#vf-dashboard {
   height: 10vh;
   width: auto;
   border-radius: 10px;
 }
-#my-video-dialog {
-  width: 100%;
-  height: auto;
-  border-radius: 20px;
-}
-video.selfview {
-  background-color: #A0A0A0;
-  transform: scale(-1, 1);
-}
-div.miclevel {
-  position: absolute;
-  top:0px; left:0px;
+div#vf-dialog {
   width: 100%;
   height: 100%;
+  border-radius: 20px;
 }
-div.miclevel canvas {
+div.vf {
+  position: relative;
+  background-color: #050505;
+  overflow: hidden;
+}
+div.vf video {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translateY(-50%) translateX(-50%) scale(-1, 1);
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+div.vf canvas {
+  position: absolute;
+  top:0px; left:0px;
   width: 100%;
   height: 100%;
 }

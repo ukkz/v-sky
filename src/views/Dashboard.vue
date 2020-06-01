@@ -3,24 +3,37 @@
 
     <!-- サブ部：入室時はshrinkして簡易表示（高さ縮小） -->
     <v-row ref="sub" justify="center" class="my-n5">
-      <MyInfo :me="me" v-on:changeStream="setLocalMediaStream($event)" :shrink="(current_room.name) ? true : false" />
+      <MyInfo
+        :me="me"
+        :shrink="(current_room.name) ? true : false"
+        @changeStream="setLocalMediaStream($event)"
+      />
     </v-row>
 
     <!-- メイン部：高さ自動調整（ルーム内自動レイアウト用） -->
     <v-row ref="main" justify="center" v-bind:style="style_main">
 
-      <!-- ルームに入っていないとき：一覧表示 -->
+      <!-- ルームに入っていないとき：リスト表示 -->
       <v-col v-if="!current_room.name" cols="12" :sm="(show_peerlist) ? 8 : 12">
-        <RoomList :rooms="rooms" :peers="peers" />
+        <RoomList   :public_rooms="public_rooms" :public_peers="skyway.public_peers" />
+        <v-divider></v-divider>
+        <RoomCreate :public_rooms="public_rooms" :my_peer_id="me.id" />
       </v-col>
-      <!-- ルームに入っているとき：ルーム内表示 -->
+
+      <!-- ルームに入っているとき：ルーム表示 -->
       <v-col v-if="current_room.name" cols="12">
-        <RoomView :me="me" :mystream="local_media_stream" :skywaypeer="skyway.peer" :peers="peers" v-on:roomChange="sync" />
+        <RoomView
+          :me="me"
+          :mystream="local_media_stream"
+          :skywaypeer="skyway.peer"
+          @sync="sync"
+          @changeRoom="changeRoom()"
+        />
       </v-col>
 
       <!-- ピア一覧を表示 -->
       <v-col v-if="show_peerlist" cols="12" sm="4">
-        <UserList :peers="peers" />
+        <UserList :peers="skyway.public_peers" />
       </v-col>
 
     </v-row>
@@ -31,13 +44,15 @@
 
 
 <script>
-import RoomList from '@/components/RoomList.vue'
-import RoomView from '@/components/RoomView.vue'
-import MyInfo   from '@/components/MyInfo.vue'
-import UserList from '@/components/UserList.vue'
+import RoomCreate from '@/components/RoomCreate.vue'
+import RoomList   from '@/components/RoomList.vue'
+import RoomView   from '@/components/RoomView.vue'
+import MyInfo     from '@/components/MyInfo.vue'
+import UserList   from '@/components/UserList.vue'
 
 export default {
   components: {
+    RoomCreate,
     RoomList,
     RoomView,
     MyInfo,
@@ -52,9 +67,9 @@ export default {
       skyway: {
         apikey: process.env.VUE_APP_SKYWAY_APIKEY,
         peer: null,
-        connections: {},
+        connections: {},  // 直接変更禁止
+        public_peers: {}, // 直接変更禁止
       },
-
       // その他設定
       show_peerlist: false,
       // スタイル
@@ -88,59 +103,27 @@ export default {
     // SkyWayのPeerを作成する（この時点ではStreamは不要）
     this.skyway.peer = new Peer({
       key: this.skyway.apikey,
-      debug: ((this.develop_mode) ? 3 : 1),
-    });
-
-    // エラーハンドラ
-    this.skyway.peer.on('error', error => {
-      if (this.develop_mode) console.log(`Peer接続に関するエラーが発生しました: ${error.type}: ${error.message}`);
+      debug: ((this.develop_mode) ? 2 : 0),
     });
 
     // シグナリングサーバ接続
     // 自身のIDを記録し接続通知を送信
     this.skyway.peer.on('open', myid => {
-      // 自分のピアIDをセットしオンライン状態に（ピアリストにも登録）
+      // 自分のピアIDをセットしオンライン状態に
       this.$store.dispatch('setMyPeerId', myid);
       // Peer全てに通知
-      this.broadcast();
+      this.syncAllPeers();
     });
+
     // シグナリングサーバ切断
     this.skyway.peer.on('disconnected', () => this.$store.dispatch('clearMyPeerId'));
 
     // データコネクション到着
-    this.skyway.peer.on('connection', incomingDataConnection => {
-      const remoteId = incomingDataConnection.remoteId;
-      // 特定のピアからデータが来たとき
-      incomingDataConnection.on('data', anybody => {
-        if (anybody.id in this.peers && anybody.id in this.skyway.connections) {
-          // すでに登録されている（データコネクション確立している）ピア
-          if (this.develop_mode) console.log(anybody.name + 'から更新を受信しました :', anybody.room);
-          // ピア情報を更新する
-          this.$store.commit('updatePeer', anybody);
-        } else {
-          // 未登録のピア（新規ユーザー）には返答する
-          if (!incomingDataConnection.open) return;
-          // 誰かがログアウトしたりページを終了すると以下でRTCErrorEventが発生する
-          const newConnection = this.skyway.peer.connect(remoteId, { serialization: 'json' });
-          newConnection.on('open', () => newConnection.send(this.me));
-          if (this.develop_mode) console.log(anybody.name + 'がオンラインになりました - 次のデータを返送します :', this.me);
-          // ピア情報とDataConnectionを追加する
-          this.$store.commit('updatePeer', anybody);
-          this.$set(this.skyway.connections, newConnection.remoteId, newConnection);
-        }
-      });
-      // 特定のピアとのデータコネクションが切断されたとき
-      incomingDataConnection.on('close', () => {
-        // オブジェクトから削除する
-        if (this.develop_mode) console.log(remoteId + 'がオフラインになりました');
-        // DataConnectionを明示的に切断する
-        if (remoteId in this.skyway.connections && 
-            this.skyway.connections[remoteId] && 
-            this.skyway.connections[remoteId].open) 
-            this.skyway.connections[remoteId].close(true);
-        this.$delete(this.skyway.connections, remoteId);
-        this.$store.commit('removePeer', remoteId);
-      });
+    this.skyway.peer.on('connection', incomingDC => {
+      // 誰かからデータが来たとき
+      incomingDC.on('data', anybody => this.setOtherPeer(incomingDC.remoteId, anybody));
+      // 誰かとのデータコネクションが切断されたとき
+      incomingDC.once('close', () => this.removeOtherPeer(incomingDC.remoteId));
     });
   },
 
@@ -155,34 +138,20 @@ export default {
   },
 
   methods: {
-    // DataConnectionを使ってすべてのピアに通知を送る
-    // 接続直後のブロードキャストのみlistAllPeersを使って送信する
-    // 受信したピアはDataConnectionを保存しておき以後はそれに対して通信する
-    broadcast() {
+    // シグナリングサーバ接続直後にlistAllPeersを使ってmeObjectを送信
+    syncAllPeers() {
       // ピアごとにコネクションを作って送信
-      let cnt = 0;
       this.skyway.peer.listAllPeers(peers => {
         peers.forEach(pid => {
           if (pid == this.skyway.peer.id) return; // 自分のIDはスキップ
-          // WIP:以下でconnectするときすでにいないピアに接続しようとしてエラーが出る問題のハンドリング
-          const outgoingDataConnection = this.skyway.peer.connect(pid, {
-            //dcInit: {maxRetransmits: 2},
-            serialization: 'json',
-          });
-          outgoingDataConnection.on('open', () => {
-            // 確立したら送信
-            outgoingDataConnection.send(this.me);
-            // 相手の情報を登録しておく（確定しているのはピアIDとOutgoingのデータコネクションのみ）
-            // meObjectはテンプレートなのでコピーして使う
-            const anybody = this.$store.getters.emptyMeObject;
-            anybody.id = pid;
-            this.$store.commit('updatePeer', anybody);
-            this.$set(this.skyway.connections, pid, outgoingDataConnection);
-            cnt++;
+          const outgoingDC = this.skyway.peer.connect(pid, { serialization: 'json' });
+          // 接続されたら自身のmeObjectを送信
+          outgoingDC.once('open', () => {
+            outgoingDC.send(this.me);
+            if (this.develop_mode) console.log('syncAllPeers:', pid);
           });
         });
       });
-      if (this.develop_mode) console.log(cnt + '件のピアにbroadcast送信しました :', this.current_room);
     },
 
     // ピアリストに登録済みのピアに自身の情報を送信
@@ -191,32 +160,91 @@ export default {
       let cnt = 0;
       Object.keys(this.skyway.connections).forEach(remoteId => {
         const dc = this.skyway.connections[remoteId];
-        // コネクションが開いたままのピアのみに送信する
-        if (dc && dc.open) { dc.send(this.me); cnt++; }
+        if (dc.open) {
+          // コネクションが開いたままのピアのみに送信する
+          dc.send(this.me);
+          if (this.develop_mode) {
+            if (this.current_room.name) {
+              console.log('sync(JOIN,'+this.current_room.name+'):', remoteId);
+            } else {
+              console.log('sync(LEAVE):', remoteId);
+            }
+          }
+        } else {
+          // コネクションが閉じていれば削除する
+          if (this.develop_mode) console.log('sync(MISSING):', remoteId);
+          this.removeOtherPeer(remoteId);
+        }
       });
-      if (this.develop_mode) console.log(cnt + '件のピアにsync送信しました :', this.current_room);
+    },
+
+    // ルームのタイプ変更またはストリーム更新による再入室
+    // RoomViewからの通知を受けて実行される
+    changeRoom() {
+      // 書き換えられているルーム状態をコピーする
+      const new_room_obj = Object.assign({}, this.$store.state.me.room);
+      // 一度ルームをクリアする ... 退室してRoomViewをdestroyする
+      this.$store.dispatch('clearMyRoom');
+      // roomsプロパティに以前のルームの情報が残ってしまっているので消す
+      this.skyway.peer.rooms = {};
+      // データの反映とDOMの反映が行われたのちに再度ルーム変数をセットしてRoomViewをmountする
+      this.$nextTick(() => this.$store.dispatch('setMyRoom', new_room_obj));
     },
 
     // 自分のメディアストリームの設定と削除
     setLocalMediaStream(stream) { this.$set(this, 'local_media_stream', stream) },
+
+    // 自分以外のピア情報とデータ接続を追加または更新する
+    setOtherPeer(target_id, meObject) {
+      // ピア情報を追加または更新する
+      this.$set(this.skyway.public_peers, target_id, meObject);
+      if (!(target_id in this.skyway.connections)) {
+        // 外向きのコネクションリストに存在しなければ作成・保存
+        const outgoingDC = this.skyway.peer.connect(target_id, { serialization: 'json' });
+        outgoingDC.once('close', () => { if (this.develop_mode) console.log('既存ピア '+target_id+' が切断されました') });
+        outgoingDC.once('open', () => {
+          if (this.develop_mode) console.log('新規ピア '+target_id+' ('+meObject.name+') と接続されました');
+          if (this.current_room.public !== false) {
+            // 未入室か公開ルームにいる場合（this.current_roomがtrueまたはnull）のみ返答する
+            outgoingDC.send(this.me);
+            if (this.develop_mode) console.log('次のデータを返送します:', this.me);
+          } else {
+            // 限定ルームにいる場合は返答しない
+            if (this.develop_mode) console.log('ルーム公開状態 "'+String(this.current_room.public)+'" のため応答しませんでした');
+          }
+          // connectionsリストに追加する
+          this.$set(this.skyway.connections, target_id, outgoingDC);
+        });
+      } else {
+        // すでにコネクションが保存済みならデータ更新のみ
+        if (this.develop_mode) console.log('既存ピア '+meObject.name+' が更新されました - ルーム状態:', meObject.room.name);
+      }
+    },
+    removeOtherPeer(target_id) {
+      if (target_id in this.skyway.connections && this.skyway.connections[target_id].open) this.skyway.connections[target_id].close();
+      this.$delete(this.skyway.connections,  target_id);
+      this.$delete(this.skyway.public_peers, target_id);
+      if (this.develop_mode) console.log('既存ピア '+target_id+' を削除しました');
+    },
   },
 
   computed: {
     // ログイン状態保持
     jump_when_logged_out() { return this.$store.state.logged_in },
     // ピア情報から公開ルームの配列を作成する
-    rooms() {
+    public_rooms() {
       // 返却値のベース：Mainは空室でも存在させる
       let room_list = {
         Main: {
           type: 'mesh',
           members: [],
+          public: true,
         },
       };
       // ピアごとにルーム名を抽出する
-      Object.keys(this.$store.state.peers).forEach(id => {
-        const name = this.$store.state.peers[id].room.name;
-        const type = this.$store.state.peers[id].room.type;
+      Object.keys(this.skyway.public_peers).forEach(id => {
+        const name = this.skyway.public_peers[id].room.name;
+        const type = this.skyway.public_peers[id].room.type;
         // ルーム名ごとに処理
         if (name == '') {
           // ルーム名が空白ならどこにも入室していないのでスキップ
@@ -229,18 +257,14 @@ export default {
           room_list[name] = {
             type: type,
             members: [ id ],
+            public: true,
           };
         }
       });
       return room_list;
     },
-    // 自分が入っているルームの人数
-    person_count() {
-      return (this.me.room && this.me.room in this.rooms) ? parseInt(this.rooms[this.me.room].members.length) : 0;
-    },
     // 以下はVuex監視
     me() { return this.$store.state.me },
-    peers() { return this.$store.state.peers },
     current_room() { return this.me.room },
   },
 

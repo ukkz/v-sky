@@ -16,24 +16,21 @@ export default new Vuex.Store({
       room: {
         name: '',
         type: '',
+        public: null,
+        rejoin: false,
       },
     },
-    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '' } },
+    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '', public: null, rejoin: false, } },
     // グローバルな設定変数
     config: {
       debug: false,
       speech_recognition: false,
-      qr_recognition: true,
+      qr_recognition: false,
     },
+    //
     in_line_app: false,
-    // skyway共通クラス
-    skyway: {
-      peer: '',
-      room: '',
-    },
-    // ピアに関するリスト（自身も含まれる）
-    // 中身はmeObject
-    peers: {},
+    // チャットログを退避させる用
+    chat_history: [],
   },
 
   getters: {
@@ -61,19 +58,20 @@ export default new Vuex.Store({
 
     // ルームに入る時の引数は {name: ルーム名, type: meshまたはsfu}
     _setMyRoom(state, newroom) { Vue.set(state.me, 'room', newroom) },
-    _clearMyRoom(state) { Vue.set(state.me, 'room', { name: '', type: '' }) },
+    _setMyRoomIsPublic(state, is_public) { Vue.set(state.me.room, 'public', is_public) },
+    _setMyRoomRejoinState(state, flag) { Vue.set(state.me.room, 'rejoin', flag) },
+    _setMyRoomType(state, type) { Vue.set(state.me.room, 'type', type) },
+    _clearMyRoom(state) { Vue.set(state.me, 'room', { name: '', type: '', public: null, rejoin: false, }) },
+
+    // チャットログの退避
+    storeChatLog(state, chat_array) { state.chat_history = chat_array },
+    clearChatLog(state) { state.chat_history = [] },
 
     // その他の設定変更
     speechConfig(state, onoff) { state.config.speech_recognition = onoff },
     qrConfig(state, onoff) { state.config.qr_recognition = onoff },
 
     setIsInLineApp(state, tf) { state.in_line_app = tf },
-
-    // ピア状態を更新
-    updatePeer(state, meObject) { Vue.set(state.peers, meObject.id, meObject) },
-    removePeer(state, pid) { Vue.delete(state.peers, pid) },
-    _updateMeInPeers(state) { Vue.set(state.peers, state.me.id, state.me) },
-    _removeAllPeers(state) { Vue.set(state, 'peers', {}) },
 
     // 自身のデータをクリア
     _logout(state) {
@@ -85,24 +83,17 @@ export default new Vuex.Store({
 
   actions: {
     // meObject:シグナリングでピアIDがとれているか
-    setMyPeerId(context, peer_id) {
-      context.commit('_setMyPeerId', peer_id);
-      context.commit('_updateMeInPeers');
-    },
-    clearMyPeerId(context) {
-      context.commit('_clearMyPeerId');
-      context.commit('_updateMeInPeers');
-    },
+    setMyPeerId(context, peer_id) { context.commit('_setMyPeerId', peer_id) },
+    clearMyPeerId(context) { context.commit('_clearMyPeerId') },
 
     // meObject:ルーム入退室
-    setMyRoom(context, newroom) {
-      context.commit('_setMyRoom', newroom);
-      context.commit('_updateMeInPeers');
-    },
-    clearMyRoom(context) {
-      context.commit('_clearMyRoom');
-      context.commit('_updateMeInPeers');
-    },
+    setMyRoom(context, newroom) { context.commit('_setMyRoom', newroom); },
+    setMyRoomIsPublic(context, is_public) { context.commit('_setMyRoomIsPublic', is_public) },
+    setMyRoomType(context, type) { context.commit('_setMyRoomType', type) },
+    clearMyRoom(context) { context.commit('_clearMyRoom') },
+    // 再入室フラグ
+    setRejoin(context) { context.commit('_setMyRoomRejoinState', true) },
+    clearRejoin(context) { context.commit('_setMyRoomRejoinState', false) },
 
     // ログアウト操作
     async logout(context) {
@@ -116,7 +107,6 @@ export default new Vuex.Store({
       });
       // ここで状態変更
       context.commit('_logout');
-      context.commit('_removeAllPeers');
     },
   },
 

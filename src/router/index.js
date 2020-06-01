@@ -1,5 +1,7 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
+import Dashboard from '@/views/Dashboard.vue'
+import Login from '@/views/Login.vue'
 
 Vue.use(VueRouter)
 
@@ -7,15 +9,13 @@ const routes = [
   {
     path: '/',
     name: 'Dashboard',
-    component: () => import('@/views/Dashboard.vue'),
-    meta: {
-      requiresAuth: true,
-    },
+    component: Dashboard,
+    meta: { requiresAuth: true, },
   },
   {
     path: '/login',
     name: 'Login',
-    component: () => import('@/views/Login.vue'),
+    component: Login,
   },
 ]
 
