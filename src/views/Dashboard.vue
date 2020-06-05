@@ -14,7 +14,7 @@
     <v-row ref="main" justify="center" v-bind:style="style_main">
 
       <!-- ルームに入っていないとき：リスト表示 -->
-      <v-col v-if="!current_room.name" cols="12" :sm="(show_peerlist) ? 8 : 12">
+      <v-col v-if="!current_room.name" cols="12" sm="12">
         <RoomList   :public_rooms="public_rooms" :public_peers="skyway.public_peers" />
         <v-divider></v-divider>
         <RoomCreate :public_rooms="public_rooms" :my_peer_id="me.id" />
@@ -31,11 +31,6 @@
         />
       </v-col>
 
-      <!-- ピア一覧を表示 -->
-      <v-col v-if="show_peerlist" cols="12" sm="4">
-        <UserList :peers="skyway.public_peers" />
-      </v-col>
-
     </v-row>
 
   </v-container>
@@ -48,7 +43,6 @@ import RoomCreate from '@/components/RoomCreate.vue'
 import RoomList   from '@/components/RoomList.vue'
 import RoomView   from '@/components/RoomView.vue'
 import MyInfo     from '@/components/MyInfo.vue'
-import UserList   from '@/components/UserList.vue'
 
 export default {
   components: {
@@ -56,7 +50,6 @@ export default {
     RoomList,
     RoomView,
     MyInfo,
-    UserList,
   },
 
   data() {
@@ -70,8 +63,6 @@ export default {
         connections: {},  // 直接変更禁止
         public_peers: {}, // 直接変更禁止
       },
-      // その他設定
-      show_peerlist: false,
       // スタイル
       style_main: {
         height: '100%',
