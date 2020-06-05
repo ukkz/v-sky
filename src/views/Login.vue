@@ -42,16 +42,17 @@ export default {
       guest_name_valid: false,
       guest_name_rules: [
         v => !!v || '名前を入力してください',
-        v => (v && v.length >= 2)  || '2文字以上入力してください',
-        v => (v && v.length <= 15) || '15文字以内にしてください',
-        v => (v && /^[\S]+$/.test(v)) || '空白文字は使用できません',
+        v => v && v.length >= 2  || '2文字以上入力してください',
+        v => v && v.length <= 15 || '15文字以内にしてください',
+        v => v && /^[\S]+$/.test(v) || '空白文字は使用できません',
       ],
     }
   },
   methods: {
     loginAsGuest: function() {
-      // ゲストログイン      
-      this.$router.push({ name: 'Dashboard', query: { guest: this.guest_name } });
+      // ゲストログイン
+      sessionStorage.setItem('guest', this.guest_name);
+      this.$router.push({ name: 'Dashboard' });
     },
     loginWithLine: function() {
       // 未ログインならLINEへリダイレクト

@@ -82,9 +82,10 @@ export default {
   created() {
     // ログインチェック
     // ルーターでliff.init()実行済
-    if ('guest' in this.$route.query && this.$route.query.guest != '') {
+    const guest_name = sessionStorage.getItem('guest');
+    if (guest_name) {
       // guestパラメータが設定されていればその名前でゲストログイン
-      this.$store.commit('login', [this.$route.query.guest, '', 'ゲスト - オフライン']);
+      this.$store.commit('login', [guest_name, '', 'ゲスト - オフライン']);
     } else if (liff.isLoggedIn()) {
       // 通常はLINEのプロフィールでログイン
       liff.getProfile().then(profile => {
@@ -128,7 +129,7 @@ export default {
   },
 
   // ログアウトするとログインページに戻るのでdestroyされる > その前にskyway切断する
-  beforeDestroy() { this.skyway.peer.destroy(); this.skyway.peer = null },
+  beforeDestroy() { this.skyway.peer.destroy(); this.skyway.peer = null; sessionStorage.removeItem('guest') },
 
   // 状態変化に伴うrerender後に発火
   updated() {
@@ -270,7 +271,7 @@ export default {
 
   watch: {
     // ログアウト状態になったときのみログインページへ飛ばす
-    jump_when_logged_out(newValue, oldValue) { if (!newValue) this.$router.push({ name: 'Login' }) },
+    jump_when_logged_out(state) { if (!state) this.$router.push({ name: 'Login' }) },
   },
 }
 </script>

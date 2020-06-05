@@ -32,9 +32,9 @@ router.beforeEach((to, from, next) => {
     // LIFF SDK 初期化できたらルーティング
     if (to.matched.some(record => record.meta.requiresAuth) && !liff.isLoggedIn()) {
       // 要認証ページへのアクセスかつLINE未ログイン
-      if ('guest' in to.query && to.query.guest != '') {
-        // GETパラメータのguestに何かしら文字列が入っていればそれをユーザー名としてログイン済みとする
-        // 以下はそのままアクセス先ページへクエリ付きで飛ばされる
+      const guest_name = sessionStorage.getItem('guest');
+      if (guest_name) {
+        // セッションストレージのguestに名前が設定されていればゲストとしてログイン
         next();
       } else {
         // ログインページへ
