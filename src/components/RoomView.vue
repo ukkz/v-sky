@@ -29,8 +29,8 @@
       </v-list-item-action>
       <!-- 退室ボタン -->
       <v-list-item-action>
-        <v-btn v-if="$vuetify.breakpoint.xs" fab depressed small dark color="pink lighten-1" @click="$store.dispatch('clearMyRoom')"><v-icon>mdi-logout</v-icon></v-btn>
-        <v-btn v-else rounded depressed dark color="pink lighten-1" @click="$store.dispatch('clearMyRoom')"><v-icon>mdi-logout</v-icon>退室</v-btn>
+        <v-btn v-if="$vuetify.breakpoint.xs" fab depressed small dark color="pink lighten-1" @click="$emit('leave')"><v-icon>mdi-logout</v-icon></v-btn>
+        <v-btn v-else rounded depressed dark color="pink lighten-1" @click="$emit('leave')"><v-icon>mdi-logout</v-icon>退室</v-btn>
       </v-list-item-action>
     </v-list-item>
   
@@ -44,31 +44,48 @@
             :cols="col_width"
             :sm="sm_width"
             class="pa-1"
-            v-bind:style="{
+            :style="{
               'max-height': '100%',
               height: (($vuetify.breakpoint.smAndDown) ? col_height(col_width) : col_height(sm_width))+'px',
             }"
             align-self="center"
           >
             <v-item>
+
               <div class="peer-frame">
                 <video
-                  class="room-stream"
-                  v-bind:class="{mirror: (id == skywaypeer.id)}"
+                  class="peer-video"
+                  :class="{mirror: (id == skywaypeer.id)}"
                   :id="(id == skywaypeer.id) ? 'my-video-element' : id"
                   :muted="(id == skywaypeer.id)"
                   :srcObject.prop="stream"
                   autoplay
                   playsinline
                 ></video>
-                <div class="peer-icon pa-2">
+                <div class="peer-name pa-2">
                   <v-avatar :size="($vuetify.breakpoint.smAndDown) ? 20 : 40" color="indigo">
                     <img v-if="(id in room_peers) && room_peers[id].icon_url" :src="room_peers[id].icon_url">
                     <v-icon v-else dark>mdi-account-circle</v-icon>
                   </v-avatar>
                   <span class="px-2">{{ (id in room_peers) ? room_peers[id].name : 'unknown' }}</span>
                 </div>
+                <div
+                  class="peer-overlay"
+                  :style="{
+                    'background-color': (stream.video_muted) ? 'rgba(1, 1, 1, 0.7)' : 'transparent'
+                  }"
+                >
+                  <v-icon
+                    v-if="(stream.video_muted)"
+                    size="60" color="red"
+                  >mdi-video-off</v-icon>
+                  <v-icon
+                    v-if="(stream.audio_muted)"
+                    size="60" color="red"
+                  >mdi-microphone-off</v-icon>
+                </div>
               </div>
+
             </v-item>
           </v-col>
         </v-row>
@@ -147,15 +164,19 @@ export default {
   // 開始: RoomListでVuexのルーム名を指定のものに設定 > Dashboardで変更検知してv-if=trueでこのコンポーネントを描画 > mounted().SkyWayPeer.join()
   // 終了: ここでVuexのルーム名を消去 > Dashboardで変更検知してv-if=falseでこのコンポーネントを削除 > beforedestroy().SkyWayRoom.close()
   mounted() {
+    // SkyWayRoom参加
     this.join();
+    // 補助機能の開始
     if (this.speech_onoff) this.startSpeechRecognition();
     if (this.qr_onoff) this.startQR();
     // ストリームエレメントが利用可能なルーム内の高さ制限（このあと自ストリームがルームに追加されたら1回だけ更新する）
     this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
   },
   beforeDestroy() {
+    // 補助機能の終了
     if (this.qr_onoff && this.develop_mode) console.log('QRコード認識を終了しました'); // destroyでループ関数ごと破棄されるっぽいのでこのままでよい 
     if (this.speech_onoff) this.endSpeechRecognition();
+    // SkyWayRoom切断
     this.close();
   },
 
@@ -211,8 +232,7 @@ export default {
       const audio_count = parseInt(newstream.getAudioTracks().length);
       const video_count = parseInt(newstream.getVideoTracks().length);
       if (this.develop_mode) console.log('メディアストリーム変更: VideoTracks('+video_count+'), AudioTracks('+audio_count+')');
-      // 再入室フラグを設定してchangeRoomイベントを親コンポーネントに送出
-      this.$store.dispatch('setRejoin');
+      // changeRoomイベントを親コンポーネントに送出
       this.not_send_my_leaving = true; // close()で退室メッセージを送らない
       this.$emit('changeRoom');
     },
@@ -232,8 +252,14 @@ export default {
     addStream: function(mediaStreamObject) { this.$set(this.streams, mediaStreamObject.peerId, mediaStreamObject) },
     addMyStream: function() { this.mystream['peerId'] = this.skywaypeer.id; this.addStream(this.mystream) },
     removeStream: function(target_id) { this.$delete(this.streams, target_id) },
-    addPeer: function(meObject) { this.$set(this.room_peers, meObject.id, meObject) },
-    removePeer: function(target_id) { this.removeStream(target_id); this.$delete(this.room_peers, target_id) },
+    addPeer: function(meObject) {
+      this.$set(this.room_peers, meObject.id, meObject);
+      if (!(meObject.id in this.streams)) this.$set(this.streams, meObject.id, (new MediaStream()) );
+    },
+    removePeer: function(target_id) {
+      this.removeStream(target_id);
+      this.$delete(this.room_peers, target_id);
+    },
 
     // colsの個数とcontainerの高さから段数を求めてcols1つあたりの高さを出す
     col_height(col_width) {
@@ -376,10 +402,8 @@ export default {
           if (this.develop_mode) console.log('通信タイプの異なる同名ルームが存在するため再入室します');
           // ルームタイプ切替・再入室フラグ設定
           const new_room_type = (this.me.room.type == 'mesh') ? 'sfu' : 'mesh';
-          this.$store.dispatch('setMyRoomType', new_room_type);
-          this.$store.dispatch('setRejoin');
           // 書き換えたルーム情報で再入室
-          this.$emit('changeRoom');
+          this.$emit('changeRoom', { type: new_room_type, rejoin: true, });
           // 親コンポーネント側でdestroyされたあと再mountされる
         } else {
           if (this.develop_mode) console.log('未定義エラー:', error);
@@ -427,8 +451,10 @@ export default {
         // 画面上に自ストリームを追加（空ストリームでもよい）
         this.addMyStream();
       });
-      // 誰かからのストリームを受信したらデータ内の配列に追加する
-      this.skywayroom.on('stream', mediaStream => this.addStream(mediaStream));
+      // 誰かからのストリームを受信したらデータ内の配列に追加または更新する
+      // ビデオか音声どちらかだけをunmuteしたときも発火するが、引数のstreamにはそのunmuteした単一のトラックのみしか入っていない
+      // そのため手元に保持しているリモートのストリームをマージする必要がある（置き換えてしまうとunmuteしたトラックのみになってしまう）
+      this.skywayroom.on('stream', mediaStream =>this.addStream(mediaStream));
       // 誰かが退室したらピア情報とストリームの両方を削除
       this.skywayroom.on('peerLeave', peerId => this.removePeer(peerId));
       // 誰かからデータ（チャットなど）を受信
@@ -455,7 +481,7 @@ export default {
                 // このコンポーネントの公開状態フラグを変更
                 this.is_public = payloadObject.data.room.public;
                 // meObjectのルーム公開状態を変更
-                this.$store.dispatch('setMyRoomIsPublic', this.is_public);
+                this.$store.commit('setMyRoomIsPublic', this.is_public);
                 // 公開ルーム かつ 再入室ではない 場合のみ親コンポーネントに通知（Dashboardのsyncを実行し公開ルームに入室したことを全体通知）
                 if (this.is_public === true && this.me.room.rejoin !== true) this.$emit('sync');
                 // dump
@@ -498,7 +524,7 @@ export default {
     // ルーム内におけるデータ全般の送信
     // type = user/speech/qr/system
     // type = qr のとき additional_data = [ IMAGE DATA URL ]
-    // type = system のとき message = 'join' / 'info' , additional_data = meObject (this.meと同じ)
+    // type = system のとき message = join / info , additional_data = meObject (this.meと同じ)
     sendPayload: function(message, type = 'user', additional_data = null) {
       if (!this.skywayroom) return; // ルームタイプ自動切替のときにnullの場合がある
       const payloadObject = {
@@ -535,7 +561,7 @@ div.peer-frame {
   overflow: hidden;
   border-radius: 30px;
 }
-video.room-stream {
+video.peer-video {
   background-color: #010101;
   position: absolute;
   width: auto;
@@ -546,10 +572,20 @@ video.room-stream {
 video.mirror {
   transform: translateX(-50%) scale(-1, 1) ;
 }
-div.peer-icon {
+div.peer-name {
   position: absolute;
   top:5px; left:5px;
   color: white;
   text-shadow: 1px 1px 3px black;
+}
+div.peer-overlay {
+  position: absolute;
+  top:0px; left:0px;
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 </style>

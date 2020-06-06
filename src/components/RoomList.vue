@@ -21,7 +21,7 @@
       </v-list-item-content>
       <v-list-item-action class="ml-2">
         <v-btn rounded dark color="indigo accent-4"
-          @click="$store.dispatch('setMyRoom', {name: name, type: room.type, public: true})"
+          @click="$emit('join', {name: name, type: room.type, public: true})"
         ><v-icon>mdi-account-arrow-right</v-icon>入室</v-btn>
       </v-list-item-action>
     </v-list-item>

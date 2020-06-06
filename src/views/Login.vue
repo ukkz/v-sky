@@ -52,7 +52,8 @@ export default {
     loginAsGuest: function() {
       // ゲストログイン
       sessionStorage.setItem('guest', this.guest_name);
-      this.$router.push({ name: 'Dashboard' });
+      // リダイレクト先がクエリで指定されていればそちらへ移動、なければルート（Dashboard）へ
+      this.$router.push( this.$route.query.redirect || '/' );
     },
     loginWithLine: function() {
       // 未ログインならLINEへリダイレクト

@@ -2,19 +2,24 @@ import Vue from 'vue'
 import VueRouter from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
 import Login from '@/views/Login.vue'
+import Room from '@/views/Room.vue'
 
 Vue.use(VueRouter)
 
 const routes = [
   {
     path: '/',
-    name: 'Dashboard',
     component: Dashboard,
     meta: { requiresAuth: true, },
   },
   {
+    path: '/room/:param_room_name',
+    component: Room,
+    props: true,
+    meta: { requiresAuth: true, },
+  },
+  {
     path: '/login',
-    name: 'Login',
     component: Login,
   },
 ]
@@ -37,8 +42,8 @@ router.beforeEach((to, from, next) => {
         // セッションストレージのguestに名前が設定されていればゲストとしてログイン
         next();
       } else {
-        // ログインページへ
-        next({ path: '/login' });
+        // ログインページへ（ルームへ直接アクセスしようとした場合はリダイレクトとしてクエリに含める）
+        next({ path: '/login', query: { redirect: to.path } });
       }
     } else {
       // 認証不要またはLINEログイン済

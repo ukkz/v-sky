@@ -6,7 +6,7 @@
     <v-list-item class="px-2">
       <v-list-item-icon class="mr-2 mt-1"><v-icon>mdi-chat-plus</v-icon></v-list-item-icon>
       <v-list-item-content class="py-0">
-        <v-form ref="form" v-model="newroom.valid" @submit.prevent>
+        <v-form v-model="newroom.valid" @submit.prevent>
           <v-text-field class="mt-0 pt-0"
             v-model="newroom.name"
             :rules="newroom.rules"
@@ -62,7 +62,7 @@
 
     <v-card-actions class="py-0" style="justify-content:flex-end;">
       <v-btn rounded color="cyan"
-        @click="$store.dispatch('setMyRoom', {name: newroom.name, type: ((newroom.is_mesh) ? 'mesh' : 'sfu'), public: newroom.public})"
+        @click="$emit('join', {name: newroom.name, type: ((newroom.is_mesh) ? 'mesh' : 'sfu'), public: newroom.public})"
         :disabled="!newroom.valid"
       ><v-icon>mdi-plus</v-icon>作成/入室</v-btn>
     </v-card-actions>

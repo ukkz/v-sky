@@ -62,8 +62,8 @@
         <v-row justify="center" dense class="mx-1">
 
           <v-col cols="6">
-            <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" :disabled="video_muted" class="mt-2"></v-select>
-            <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" :disabled="audio_muted" class="mt-n2"></v-select>
+            <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" class="mt-2"></v-select>
+            <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" class="mt-n2"></v-select>
             <v-switch v-model="qr_onoff"      :label="`QR認識：${(!qr_available)?'利用不可':(qr_onoff)?'有効':'無効'}`" :disabled="!qr_available" class="mt-n2"></v-switch>
             <v-switch v-model="speech_onoff"  :label="`音声認識：${(!speech_available)?'利用不可':(speech_onoff)?'有効':'無効'}`" :disabled="!speech_available" class="mt-n2"></v-switch>
           </v-col>
@@ -109,10 +109,6 @@ export default {
   name: 'MyInfo',
 
   props: {
-    me: {
-      type: Object,
-      required: true,
-    },
     shrink: {
       type: Boolean,
       required: false,
@@ -122,7 +118,7 @@ export default {
 
   data() {
     return {
-      config_dialog_open: true, // ダイアログは最初に必ず開く
+      config_dialog_open: false, // 設定ダイアログを最初に自動で開くかどうかはcreatedで判断
       permission_dialog_open: false,
       audio_devices: [
         {
@@ -155,6 +151,32 @@ export default {
     }
   },
 
+  created() {
+    // ログインチェック（ルーターでliff.init実行済）
+    const guest_name = sessionStorage.getItem('guest');
+    if (guest_name) {
+      // guestパラメータが設定されていればその名前でゲストログイン
+      this.$store.commit('login', [guest_name, '', 'ゲスト - オフライン']);
+    } else if (liff.isLoggedIn()) {
+      // 通常はLINEのプロフィールでログイン
+      liff.getProfile().then(profile => {
+        // LINE内ブラウザで開いているかどうか記録
+        this.$store.commit('setIsInLineApp', liff.isInClient());
+        // ログイン状態を記録（ストアの状態変更のみ）
+        this.$store.commit('login', [profile.displayName, profile.pictureUrl, 'LINEログイン完了 - オフライン']);
+      }).catch((err) => {
+        alert('LINEプロフィールの取得に失敗しました: '+err.code);
+      })
+    } else {
+      // ログインが確認できなければログインページに戻す
+      this.$router.push({ name: 'Login' });
+    }
+    // SkyWay Peer 初期化
+    this.$store.dispatch('connectSkyWay');
+    // ページセッションが2回目以降（used_deviceのキーがaudioもvideoもストレージ内に存在する）ならダイアログを開かない
+    this.config_dialog_open = (sessionStorage.getItem('used_audio_device') && sessionStorage.getItem('used_video_device')) ? false : true;
+  },
+
   mounted: async function() {
     // デバイスを取得
     const deviceInfos = await navigator.mediaDevices.enumerateDevices();
@@ -174,7 +196,7 @@ export default {
     // カメラとマイクのパーミッションを確認
     if (await this.cam_allowed() && await this.mic_allowed()) {
       // 許可済みの場合はそのままgetUserMedia
-      this.onChangeLocalDevice();
+      await this.startLocalDevice();
     } else {
       // 未許可または拒否の場合はとりあえずダイアログを出す
       // このダイアログ内のボタンを明示的に押してonChangeLocalDeviceを発火させる
@@ -191,37 +213,62 @@ export default {
   },
 
   methods: {
+    // ページロード直後の最初にメディアストリームの取得を試みる
+    startLocalDevice: async function() {
+      const used_audio_device = sessionStorage.getItem('used_audio_device');
+      const used_video_device = sessionStorage.getItem('used_video_device');
+      // Storageは保存されていない（キー未定義）であればundefinedではなくnullとなる
+      if (used_audio_device !== null && used_video_device !== null) {
+        // エラーの出なかったデバイスがあればそれを選択済みにする
+        this.selectedAudio = JSON.parse(used_audio_device);
+        this.selectedVideo = JSON.parse(used_video_device);
+      }
+      // 通常どおりのgetUserMedia
+      await this.onChangeLocalDevice();
+    },
+
     // 映像・音声デバイスが変更されたら発火
     onChangeLocalDevice: async function() {
       // 映像デバイスの細かな指定
       let constraint_video;
-      if (this.selectedVideo && !this.video_muted) {
+      if (this.selectedVideo) {
         // facingModeによる指定
         if (this.selectedVideo == 'environment') constraint_video = { facingMode: { exact: 'environment' } };
         else if (this.selectedVideo == 'user') constraint_video = { facingMode: 'user' };
         // deviceIdによる指定
         else constraint_video = { deviceId: this.selectedVideo };
       } else {
-        // デバイスを使用しない
+        // 「使用しない」はこっち
         constraint_video = false;
       }
-      // デバイス指定（どっちもfalseだとだめらしい）
-      const constraints = {
-        audio: (this.selectedAudio && !this.audio_muted) ? { deviceId: this.selectedAudio } : false,
+      // デバイス制約
+      const new_constraints = {
+        audio: (this.selectedAudio) ? { deviceId: this.selectedAudio } : false,
         video: constraint_video,
       };
       // ストリームは空白状態では何も送信しない（受信専用ピアになる）
       let mystream = new MediaStream();
       try {
-        mystream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (e) {
-        if (e instanceof TypeError) console.log('いずれのMediaも有効になっていないため受信専用モードになりました');
-        if (e instanceof DOMException) alert('デバイスの利用が許可されませんでした。メディアは受信専用でテキスト送受信のみ可能となります。');
-        if (e instanceof OverconstrainedError) alert('指定のカメラはこの端末では利用できません。別のカメラを選択してください。');
-      } finally {
+        // デバイスからメディア取得を試みる
+        mystream = await navigator.mediaDevices.getUserMedia(new_constraints); // デバイスが取得できないときはここでエラー
+        // 正常に取得できていればページセッション中は利用デバイスを保持（ビデオ不使用でキープできたりする）
+        sessionStorage.setItem('used_audio_device', JSON.stringify(this.selectedAudio));
+        sessionStorage.setItem('used_video_device', JSON.stringify(this.selectedVideo));
         // ストリームを設定（ルーム接続中なら自動でreplaceされる）
         this.setLocalMediaStream(mystream);
-        // 波形表示を開始
+      } catch (e) {
+        if (e instanceof TypeError) {
+          // audioもvideoもfalseだった場合は空ストリームを送る受信モードにする
+          console.log('いずれのMediaも有効になっていないため受信専用モードになりました');
+          this.setLocalMediaStream( new MediaStream() );
+          sessionStorage.setItem('used_audio_device', JSON.stringify(this.selectedAudio));
+          sessionStorage.setItem('used_video_device', JSON.stringify(this.selectedVideo));
+        } else {
+          if (e instanceof DOMException) alert('デバイスの利用が許可されませんでした。メディアは受信専用でテキスト送受信のみ可能となります。');
+          if (e instanceof OverconstrainedError) alert('指定のカメラ/マイクはこの端末では利用できません。別のカメラ/マイクを選択してください。');
+        }
+      } finally {
+        // 波形表示を開始（または再開）
         this.drawMicLevel(this.local_media_stream, (this.config_dialog_open) ? 'miclevel-dialog' : 'miclevel-dashboard', 15);
       }
     },
@@ -231,6 +278,9 @@ export default {
       // 以前のストリームが存在する場合は破棄してから新しくセットする
       this.destroyLocalMediaStream();
       this.$set(this, 'local_media_stream', stream);
+      // 映像または音声のトラックの有無に応じてミュート状態も変化させる
+      this.audio_muted = (!stream.getAudioTracks()[0]) ? true : false;
+      this.video_muted = (!stream.getVideoTracks()[0]) ? true : false;
       // 親コンポーネントへイベント送出
       this.$emit('changeStream', this.local_media_stream);
     },
@@ -325,9 +375,14 @@ export default {
 
     // ログアウトする
     logout: function() {
+      // セッションストレージ変数削除
+      sessionStorage.clear();
+      // メディアストリーム削除
       this.destroyLocalMediaStream();
       // store/index.jsのactionsでLINEログアウト処理などを行ったのち状態変数をログアウトに
       this.$store.dispatch('logout');
+      // ログインページ
+      this.$router.push({ path: '/login' });
     },
   },
 
@@ -346,24 +401,26 @@ export default {
         if (this.local_media_stream.getVideoTracks().length) this.$store.commit('qrConfig', onoff);
       },
     },
+    // Vuex監視用
+    me() { return this.$store.state.me },
   },
 
   watch: {
     // 映像・音声のミュート
     video_muted: function(state) {
-      this.onChangeLocalDevice();
+      this.local_media_stream.getVideoTracks().forEach(video_track => video_track.enabled = !state);
       // 映像を消したときのみQR認識を連動して無効にする（ミュート解除に連動して有効化はしない）
       if (state) this.qr_onoff = false;
     },
     audio_muted: function(state) {
-      this.onChangeLocalDevice();
+      this.local_media_stream.getAudioTracks().forEach(audio_track => audio_track.enabled = !state);
       // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
       if (state) this.speech_onoff = false;
     },
     // 設定ダイアログの開閉
-    config_dialog_open: function(state) {
+    config_dialog_open: function(newstate, oldstate) {
       // 現在表示しているほう（ダッシュボードまたはダイアログ）でレベルメータを再表示
-      this.drawMicLevel(this.local_media_stream, (state) ? 'miclevel-dialog' : 'miclevel-dashboard', 15);
+      this.$nextTick(() => this.drawMicLevel(this.local_media_stream, (newstate) ? 'miclevel-dialog' : 'miclevel-dashboard', 15));
     },
   },
 }
