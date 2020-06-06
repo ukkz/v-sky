@@ -106,7 +106,7 @@
 
 <script>
 export default {
-  name: 'MyInfo',
+  name: 'Core',
 
   props: {
     shrink: {

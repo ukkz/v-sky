@@ -3,7 +3,7 @@
 
     <!-- コアコンポーネント -->
     <v-row justify="center" class="my-n5">
-      <MyInfo :shrink="false" />
+      <Core :shrink="false" />
     </v-row>
 
     <v-row justify="center">
@@ -30,15 +30,15 @@
 
 
 <script>
+import Core     from '@/components/Core.vue'
 import RoomCreate from '@/components/RoomCreate.vue'
 import RoomList   from '@/components/RoomList.vue'
-import MyInfo     from '@/components/MyInfo.vue'
 
 export default {
   components: {
+    Core,
     RoomCreate,
     RoomList,
-    MyInfo,
   },
 
   methods: {

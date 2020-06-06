@@ -3,7 +3,7 @@
 
     <!-- コアコンポーネント -->
     <v-row ref="core_area" justify="center" class="my-n5">
-      <MyInfo
+      <Core
         :shrink="true"
         @changeStream="setLocalMediaStream($event)"
       />
@@ -32,13 +32,13 @@
 
 
 <script>
+import Core   from '@/components/Core.vue'
 import RoomView from '@/components/RoomView.vue'
-import MyInfo   from '@/components/MyInfo.vue'
 
 export default {
   components: {
+    Core,
     RoomView,
-    MyInfo,
   },
 
   props: {
