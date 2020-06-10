@@ -12,13 +12,14 @@
     <!-- ルーム内：高さ自動調整 -->
     <v-row ref="room_area" justify="center" :style="style_room_area">
 
-      <!-- 4条件が揃ったらルーム入室する -->
+      <!-- 3つの条件が揃ったらルーム入室する -->
       <v-col v-if="peer_id_valid && room_config_valid && mystream_available" cols="12">
         <RoomView
           :me="me"
           :mystream="local_media_stream"
           :skywaypeer="$store.state.skyway.peer"
-          @sync="$store.dispatch('sync')"
+          :chat_payloads="chat_payloads"
+          @sync="sync()"
           @changeRoom="changeRoom($event)"
           @leave="leave()"
         />
@@ -56,6 +57,11 @@ export default {
       style_room_area: {
         height: '100%',
       },
+      // ルーム内チャットの配列・再入室時も保持できるため
+      chat_payloads: [],
+      // ルームに正常に入室後にsyncを行ったかどうか
+      // 公開ルームであればストリーム切替時に2回目以降のsyncが発出されるためそれを抑制（タイプが違う場合の再入室では1度もsyncしない）
+      is_sent_sync: false,
       // ルーム内部コンポーネントの表示準備
       peer_id_valid: false,     // シグナリングサーバからピアIDが取得できているか
       room_config_valid: false, // ルーム名がルール内（半角英数字3~20文字）かつtypeとpublicが指定されているか
@@ -76,7 +82,6 @@ export default {
         name: this.param_room_name, // URLパラメータのやつ
         type: 'mesh',
         public: true,
-        rejoin: false,
       };
       // セットする
       // このあとwatch()が発火して this.room_config_valid = true になる
@@ -108,8 +113,18 @@ export default {
     // 退室
     leave() {
       this.$store.commit('clearMyRoom'); // this.room_config_valid = false になり RoomView > destroy()
+      // ルームに入っていない状態でsync - ルームからの退出を全体通知
+      // ここではルームが公開か限定かは関係なく全ての場合で通知送信される
+      this.$store.dispatch('sync');
       // Dashboardへ移動
       this.$nextTick(() => this.$router.push({ path: '/' }));
+    },
+
+    // 入室時のsync送信
+    // 公開ルーム内でストリーム切替時も出るがそれは抑制する
+    sync() {
+      if (!this.is_sent_sync) this.$store.dispatch('sync');
+      this.is_sent_sync = true;
     },
 
     // Coreでストリームが変更（デバイスが変更）されたら発火する

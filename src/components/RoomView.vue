@@ -128,6 +128,10 @@ export default {
       type: Object,
       required: true,
     },
+    chat_payloads: {
+      type: Array,
+      required: true,
+    },
   },
 
   data() {
@@ -145,9 +149,6 @@ export default {
       is_public: null,
       // botによる退室メッセージを送らない ... 再入室の前にtrueにする
       not_send_my_leaving: false,
-      // chat内をpeerの要素リンクにすると誰かが退室したらその人の過去チャットが参照できなくなるので注意
-      chat_open: false,
-      chat_payloads: [],
       // 音声認識
       sr: {
         available: false,
@@ -403,7 +404,7 @@ export default {
           // ルームタイプ切替・再入室フラグ設定
           const new_room_type = (this.me.room.type == 'mesh') ? 'sfu' : 'mesh';
           // 書き換えたルーム情報で再入室
-          this.$emit('changeRoom', { type: new_room_type, rejoin: true, });
+          this.$emit('changeRoom', { type: new_room_type });
           // 親コンポーネント側でdestroyされたあと再mountされる
         } else {
           if (this.develop_mode) console.log('未定義エラー:', error);
@@ -424,9 +425,9 @@ export default {
         // 既にルームがある場合は他の参加者から情報をもらうまで公開状態は未確定とする
         this.is_public = (log.length == 1) ? this.me.room.public : null;
         // 自分が作成者 かつ 公開設定 かつ 再入室ではない 場合のみ親コンポーネントに通知（Dashboardのsyncを実行し公開ルームを作成・入室したことを全体通知）
-        if (this.is_public === true && this.me.room.rejoin !== true) this.$emit('sync');
+        if (this.is_public === true) this.$emit('sync');
         // dump
-        if (this.develop_mode && this.me.room.rejoin !== true) {
+        if (this.develop_mode) {
           if (this.is_public === true)  console.log('公開ルームを新規作成しました');
           if (this.is_public === false) console.log('限定ルームを新規作成しました');
           console.log('ルーム "' + this.me.room.name + '"（' + this.me.room.type + '）に入室しました');
@@ -441,11 +442,8 @@ export default {
         this.skywayroom.getLog();
         // 入室通知（peerJoinイベントではなくこちらを使う）
         this.sendPayload('join', 'system', this.me);
-        // 再入室の場合で退避されたチャットがあれば復元する
-        this.$store.state.chat_history.forEach(payloadObject => this.chat_payloads.push(payloadObject));
-        this.$store.commit('clearChatLog');
-        // 自分が入室したことをチャットに送る（ただし再入室の場合は送らない）
-        if (this.me.room.rejoin !== true) this.sendPayload(this.me.name+'さんが入室しました', 'bot');
+        // 自分が入室したことをチャットに送る（ただし再入室などすでにチャット配列に何か入っている場合は送らない）
+        if (this.chat_payloads.length == 0) this.sendPayload(this.me.name+'さんが入室しました', 'bot');
         // ストリームの映像枠が利用可能なエリアの高さを更新する（これ以降は変更させない）
         this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
         // 画面上に自ストリームを追加（空ストリームでもよい）
@@ -483,9 +481,9 @@ export default {
                 // meObjectのルーム公開状態を変更
                 this.$store.commit('setMyRoomIsPublic', this.is_public);
                 // 公開ルーム かつ 再入室ではない 場合のみ親コンポーネントに通知（Dashboardのsyncを実行し公開ルームに入室したことを全体通知）
-                if (this.is_public === true && this.me.room.rejoin !== true) this.$emit('sync');
+                if (this.is_public === true) this.$emit('sync');
                 // dump
-                if (this.develop_mode && this.me.room.rejoin !== true) {
+                if (this.develop_mode) {
                   if (this.is_public === true)  console.log('"'+this.me.room.name+'" は公開ルームです');
                   if (this.is_public === false) console.log('"'+this.me.room.name+'" は限定ルームです'); 
                 }
@@ -498,23 +496,16 @@ export default {
 
     // SkyWay:ルームから退出する
     close() {
-      if (this.not_send_my_leaving) {
-        // 一時的な退室（あとですぐ再入室する）
-        // チャットを退避させる
-        this.$store.commit('storeChatLog', this.chat_payloads);
-      } else {
-        // 通常の退室
-        // 自分が退室したことをチャットに送る
-        this.sendPayload(this.me.name+'さんが退室しました', 'bot');
-      }
+      // 通常の退室時のみチャットにメッセージを送る
+      if (!this.not_send_my_leaving) this.sendPayload(this.me.name+'さんが退室しました', 'bot');
       // 自分が退室（closeメソッド使用後に自動で発火）
       this.skywayroom.once('close', () => {
-        // 親コンポーネントに通知（Dashboardのsyncを実行し公開ルームから退出したことを全体通知）
-        // この関数が発火した時点でVuexのルームオブジェクトは空になっているのでsync送信データは常に未入室となる
-        // 再入室の場合は送らない
-        if (!this.not_send_my_leaving) {
-          this.$emit('sync');
-          if (this.develop_mode) console.log('ルーム "' + this.skywayroom.name + '" から退室しました');
+        if (this.develop_mode) {
+          if (!this.not_send_my_leaving) {
+            console.log('ルーム "' + this.skywayroom.name + '" から退室しました');
+          } else {
+            console.log('ストリーム切替のため再入室します: 一時退室しました');
+          }
         }
       });
       // このあとon.closeイベントが発火してそのハンドラ内で実際に退出

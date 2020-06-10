@@ -18,10 +18,9 @@ export default new Vuex.Store({
         name: '',
         type: '',
         public: null,
-        rejoin: false,
       },
     },
-    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '', public: null, rejoin: false, } },
+    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '', public: null, } },
     // グローバルな設定変数
     config: {
       debug: false,
@@ -37,8 +36,6 @@ export default new Vuex.Store({
     },
     //
     in_line_app: false,
-    // チャットログを退避させる用
-    chat_history: [],
   },
 
   getters: {
@@ -111,16 +108,11 @@ export default new Vuex.Store({
     // ルームに入る時の引数は {name: ルーム名, type: meshまたはsfu}
     setMyRoom(state, newroom) { Vue.set(state.me, 'room', newroom) },
     setMyRoomIsPublic(state, is_public) { Vue.set(state.me.room, 'public', is_public) },
-    setMyRoomRejoin(state) { Vue.set(state.me.room, 'rejoin', true) },
     setMyRoomType(state, type) { Vue.set(state.me.room, 'type', type) },
     clearMyRoom(state) {
       Vue.set(state.skyway.peer, 'rooms', {}); // Peer内部メンバも消去する
-      Vue.set(state.me, 'room', { name: '', type: '', public: null, rejoin: false, });
+      Vue.set(state.me, 'room', { name: '', type: '', public: null, });
     },
-
-    // チャットログの退避
-    storeChatLog(state, chat_array) { state.chat_history = chat_array },
-    clearChatLog(state) { state.chat_history = [] },
 
     // その他の設定変更
     speechConfig(state, onoff) { state.config.speech_recognition = onoff },
