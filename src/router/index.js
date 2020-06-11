@@ -3,6 +3,7 @@ import VueRouter from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
 import Login from '@/views/Login.vue'
 import Room from '@/views/Room.vue'
+import Direct from '@/views/Direct.vue'
 
 Vue.use(VueRouter)
 
@@ -15,6 +16,12 @@ const routes = [
   {
     path: '/room/:param_room_name',
     component: Room,
+    props: true,
+    meta: { requiresAuth: true, },
+  },
+  {
+    path: '/direct/:param_client_peerid',
+    component: Direct,
     props: true,
     meta: { requiresAuth: true, },
   },

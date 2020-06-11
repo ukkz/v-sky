@@ -1,7 +1,7 @@
 <template>
   <v-card flat class="py-2">
 
-    <v-subheader>新規作成 / 限定ルーム入室</v-subheader>
+    <v-subheader>新規ルーム作成 / 限定ルーム入室</v-subheader>
 
     <v-list-item class="px-2">
       <v-list-item-icon class="mr-2 mt-1"><v-icon>mdi-chat-plus</v-icon></v-list-item-icon>

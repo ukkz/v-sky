@@ -3,7 +3,7 @@
 
     <!-- ルームの情報 -->
     <v-list-item ref="info_area">
-      <!-- ルーム名 -->
+      <!-- 基本情報表示 -->
       <v-list-item-content>
         <!-- ルーム名 -->
         <v-list-item-title class="headline">
@@ -179,6 +179,8 @@ export default {
     // 補助機能の終了
     if (this.qr_onoff && this.develop_mode) console.log('QRコード認識を終了しました'); // destroyでループ関数ごと破棄されるっぽいのでこのままでよい 
     if (this.speech_onoff) this.endSpeechRecognition();
+    // リスナを削除
+    this.skywaypeer.removeAllListeners('error');
     // SkyWayRoom切断
     this.close();
   },

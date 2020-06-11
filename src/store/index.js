@@ -19,8 +19,11 @@ export default new Vuex.Store({
         type: '',
         public: null,
       },
+      payload: null,
     },
-    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '', public: null, } },
+    meObject: { id: '', name: '', icon_url: '', status: '', room: { name: '', type: '', public: null, }, payload: null },
+    // 追加データを受信したときのバッファ（state.me.payloadがnullでないときにコピーされる）
+    client_payload_buffer: null,
     // グローバルな設定変数
     config: {
       debug: false,
@@ -33,13 +36,17 @@ export default new Vuex.Store({
       peer: null,
       connections: {},
       public_peers: {},
+      direct_media_connection: null,
     },
     //
     in_line_app: false,
   },
 
   getters: {
+    is_direct_caller: state => { return (state.skyway.direct_media_connection === null) ? true : false },
     emptyMeObject: state => { return Object.assign({}, state.meObject) },
+    peer_data: (state) => (id) => { return state.skyway.public_peers[id] },
+    connection: (state) => (id) => { return state.skyway.connections[id] },
     public_rooms(state) {
       // 返却値のベース：Mainは空室でも存在させる
       let room_list = {
@@ -114,6 +121,12 @@ export default new Vuex.Store({
       Vue.set(state.me, 'room', { name: '', type: '', public: null, });
     },
 
+    // 直接接続
+    setDirectMediaConnection(state, media_connection) { Vue.set(state.skyway, 'direct_media_connection', media_connection) },
+    clearDirectMediaConnection(state) { Vue.set(state.skyway, 'direct_media_connection', null) },
+    // 追加データのバッファへのコピー
+    _payload_copy_to_buffer(state, payload) { Vue.set(state, 'client_payload_buffer', payload) },
+
     // その他の設定変更
     speechConfig(state, onoff) { state.config.speech_recognition = onoff },
     qrConfig(state, onoff) { state.config.qr_recognition = onoff },
@@ -162,8 +175,11 @@ export default new Vuex.Store({
       peer.on('connection', incomingDC => {
         // 誰かからデータが来たとき
         incomingDC.on('data', anybody => {
-          // ピア情報を追加または更新する
+          // 共通：ピア情報を追加または更新
           context.commit('_addPeer', { id: incomingDC.remoteId, body: anybody });
+          // 共通：追加データ（payload）に何か入っていればバッファに退避・書き換え（ピア間の直接通信で利用）
+          if (anybody.payload) context.commit('_payload_copy_to_buffer', anybody.payload);
+          // 分岐：宛先が新規か既存か
           if (!(incomingDC.remoteId in context.state.skyway.connections)) {
             // 外向きのコネクションリストに存在しなければ作成・保存
             const outgoingDC = context.state.skyway.peer.connect(incomingDC.remoteId, { serialization: 'json' });
