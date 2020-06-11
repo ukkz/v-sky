@@ -157,7 +157,9 @@ export default {
       },
       // ルームの初期高さ（mounted時にセットする）
       // これはマウント中には基本的には変化しない
-      initial_room_height: 0,
+      initial_stream_area_height: 0,
+      // チャットウインドウの開閉
+      chat_open: false,
     }
   },
 
@@ -169,9 +171,9 @@ export default {
     this.join();
     // 補助機能の開始
     if (this.speech_onoff) this.startSpeechRecognition();
-    if (this.qr_onoff) this.startQR();
+    if (this.qr_onoff) this.startQR('my-video-element');
     // ストリームエレメントが利用可能なルーム内の高さ制限（このあと自ストリームがルームに追加されたら1回だけ更新する）
-    this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
+    this.initial_stream_area_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
   },
   beforeDestroy() {
     // 補助機能の終了
@@ -244,7 +246,7 @@ export default {
     },
     // グローバル設定値変更検知:QR認識
     qr_onoff(current, previous) {
-      if (current && !previous) this.startQR(); // 途中でオンにした
+      if (current && !previous) this.startQR('my-video-element'); // 途中でオンにした
       // 途中でオフにしたときは自動で停止する
     },
   },
@@ -269,7 +271,7 @@ export default {
       // ストリームの段数（col_widthはpxでなくブレイクポイントのグリッド幅数、12が全幅）
       const rows = (col_width > 0) ? Math.ceil(l / (12 / col_width)) : 1;
       // ルームの高さを必要段数で割る（端数切り上げ）
-      return Math.floor(this.initial_room_height / rows);
+      return Math.floor(this.initial_stream_area_height / rows);
     },
 
     // 文字起こし開始
@@ -324,7 +326,7 @@ export default {
     // QR認識準備
     // 開始はqr_onoffをtrueにしてからstartQR()実行
     // 終了はqr_onoffをfalseにする
-    startQR(interval = 10, fps = 5) {
+    startQR(target_video_element_id, interval = 10, fps = 5) {
       if (this.develop_mode) console.log('QRコード認識が開始されました');
       const crop_ratio = 0.5; // 1以下、映像中央から元と同一の縦横比の矩形を抜き出す
       const sd_w = 160;
@@ -340,7 +342,7 @@ export default {
         // ---- 処理開始 ----
         begin = Date.now();
         // ビデオエレメントを取得する（メディア利用不可ならinterval秒間待って再試行）
-        myvideo = document.getElementById('my-video-element');
+        myvideo = document.getElementById(target_video_element_id);
         if (!myvideo || myvideo.readyState == 0) { setTimeout(loop, interval_seconds); return; }
         // ストリームのオリジナルサイズを取得
         orig_w = myvideo.videoWidth;
@@ -445,7 +447,7 @@ export default {
         // 自分が入室したことをチャットに送る（ただし再入室などすでにチャット配列に何か入っている場合は送らない）
         if (this.chat_payloads.length == 0) this.sendPayload(this.me.name+'さんが入室しました', 'bot');
         // ストリームの映像枠が利用可能なエリアの高さを更新する（これ以降は変更させない）
-        this.initial_room_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
+        this.initial_stream_area_height = this.$refs.room_area.$el.offsetHeight - this.$refs.info_area.$el.offsetHeight;
         // 画面上に自ストリームを追加（空ストリームでもよい）
         this.addMyStream();
       });
