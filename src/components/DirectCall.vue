@@ -41,7 +41,7 @@ export default {
         rules: [
           v => !!v || 'ピアIDを入力してください',
           v => /^[0-9a-zA-Z]+$/.test(v) || '半角英数字のみ有効です',
-          v => v.length == 16 || '16文字必要です',
+          v => v.length >= 3 || '3文字以上で指定してください',
           v => v != this.$store.state.skyway.peer.id || '自身のIDには接続できません',
         ],
       },

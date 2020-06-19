@@ -5,7 +5,7 @@
       <v-list-item-content>
         <!-- 接続先の名前 -->
         <v-list-item-title class="headline">
-          {{ (client_data) ? '1-on-1 : ' + client_data.name : 'Connection unavailable' }}
+          {{ (client_data) ? '1-on-1 : ' + client_data.name : 'Peer/' + client_peer_id }}
         </v-list-item-title>
       </v-list-item-content>
       <!-- チャットオープンボタン -->
