@@ -363,11 +363,13 @@ export default {
 
     // カメラ・マイクそれぞれのPermissionがgrantedかどうか
     cam_allowed: async function() {
+      if (!("permissions" in navigator)) return true;
       const cam = await navigator.permissions.query({name: 'camera'});
       // granted/prompt/denied
       return (cam.state == 'granted');
     },
     mic_allowed: async function() {
+      if (!("permissions" in navigator)) return true;
       const mic = await navigator.permissions.query({name: 'microphone'});
       // granted/prompt/denied
       return (mic.state == 'granted');
