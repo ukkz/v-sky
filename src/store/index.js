@@ -27,6 +27,8 @@ export default new Vuex.Store({
     // グローバルな設定変数
     config: {
       debug: false,
+      video_muted: false,
+      audio_muted: false,
       speech_recognition: false,
       qr_recognition: false,
     },
@@ -128,6 +130,8 @@ export default new Vuex.Store({
     _payload_copy_to_buffer(state, payload) { Vue.set(state, 'client_payload_buffer', payload) },
 
     // その他の設定変更
+    videoMute(state, onoff) { state.config.video_muted = onoff },
+    audioMute(state, onoff) { state.config.audio_muted = onoff },
     speechConfig(state, onoff) { state.config.speech_recognition = onoff },
     qrConfig(state, onoff) { state.config.qr_recognition = onoff },
 
@@ -144,7 +148,11 @@ export default new Vuex.Store({
   actions: {
     // SkyWay
     connectSkyWay(context) {
-      if (context.state.skyway.peer !== null) return;
+      // 既にPeerが作成・保持されている場合は接続処理を実行しない
+      if (context.state.skyway.peer !== null && context.state.skyway.peer.open) {
+        context.commit('_setMyPeerId', context.state.skyway.peer.id);
+        return;
+      }
       // SkyWayのPeerを作成
       const peer = new Peer({
         key: context.state.skyway.apikey,

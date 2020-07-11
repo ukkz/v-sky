@@ -143,8 +143,6 @@ export default {
       selectedAudio: '',
       selectedVideo: '',
       local_media_stream: (new MediaStream()), // 直接変更禁止
-      audio_muted: false,
-      video_muted: false,
       miclevel_abort_flag: false, // 直接変更禁止
       speech_available: false,
       qr_available: false,
@@ -171,7 +169,7 @@ export default {
       // ログインが確認できなければログインページに戻す
       this.$router.push({ name: 'Login' });
     }
-    // SkyWay Peer 初期化
+    // SkyWay Peer 初期化（オンラインステータスなどはここで更新）
     this.$store.dispatch('connectSkyWay');
     // ページセッションが2回目以降（used_deviceのキーがaudioもvideoもストレージ内に存在する）ならダイアログを開かない
     this.config_dialog_open = (sessionStorage.getItem('used_audio_device') && sessionStorage.getItem('used_video_device')) ? false : true;
@@ -278,10 +276,13 @@ export default {
       // 以前のストリームが存在する場合は破棄してから新しくセットする
       this.destroyLocalMediaStream();
       this.$set(this, 'local_media_stream', stream);
-      // 映像または音声のトラックの有無に応じてミュート状態も変化させる
-      this.audio_muted = (!stream.getAudioTracks()[0]) ? true : false;
-      this.video_muted = (!stream.getVideoTracks()[0]) ? true : false;
-      // 親コンポーネントへイベント送出
+      // 映像または音声のトラックが無いときのみミュートにする（逆はしない）
+      if (!stream.getAudioTracks()[0]) this.audio_muted = true;
+      if (!stream.getVideoTracks()[0]) this.video_muted = true;
+      // 実際のストリームに対してミュート状態を再適用
+      stream.getAudioTracks().forEach(t => t.enabled = !this.audio_muted);
+      stream.getVideoTracks().forEach(t => t.enabled = !this.video_muted);
+      // 親コンポーネントへイベント送出（ルームなどで利用しているストリームの更新）
       this.$emit('changeStream', this.local_media_stream);
     },
     destroyLocalMediaStream() {
@@ -389,6 +390,26 @@ export default {
   },
 
   computed: {
+    // 映像・音声のミュート
+    video_muted: {
+      get() { return this.$store.state.config.video_muted },
+      set(onoff) {
+        this.local_media_stream.getVideoTracks().forEach(video_track => video_track.enabled = !onoff);
+        this.$store.commit('videoMute', onoff);
+        // 映像を消したときのみQR認識を連動して無効にする（ミュート解除に連動して有効化はしない）
+        if (onoff) this.qr_onoff = false;
+      },
+    },
+    audio_muted: {
+      get() { return this.$store.state.config.audio_muted },
+      set(onoff) {
+        this.local_media_stream.getAudioTracks().forEach(audio_track => audio_track.enabled = !onoff);
+        this.$store.commit('audioMute', onoff);
+        // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
+        if (onoff) this.speech_onoff = false;
+      },
+    },
+    // 音声認識のオンオフ
     speech_onoff: {
       get() { return this.$store.state.config.speech_recognition },
       set(onoff) {
@@ -396,6 +417,7 @@ export default {
         if (this.local_media_stream.getAudioTracks().length) this.$store.commit('speechConfig', onoff);
       },
     },
+    // QR認識のオンオフ
     qr_onoff: {
       get() { return this.$store.state.config.qr_recognition },
       set(onoff) {
@@ -408,17 +430,6 @@ export default {
   },
 
   watch: {
-    // 映像・音声のミュート
-    video_muted: function(state) {
-      this.local_media_stream.getVideoTracks().forEach(video_track => video_track.enabled = !state);
-      // 映像を消したときのみQR認識を連動して無効にする（ミュート解除に連動して有効化はしない）
-      if (state) this.qr_onoff = false;
-    },
-    audio_muted: function(state) {
-      this.local_media_stream.getAudioTracks().forEach(audio_track => audio_track.enabled = !state);
-      // 音声を消したときのみ音声認識を連動して無効にする（ミュート解除に連動して有効化はしない）
-      if (state) this.speech_onoff = false;
-    },
     // 設定ダイアログの開閉
     config_dialog_open: function(newstate, oldstate) {
       // 現在表示しているほう（ダッシュボードまたはダイアログ）でレベルメータを再表示

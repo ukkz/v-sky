@@ -47,7 +47,7 @@ export default {
 
   beforeDestroy() {
     // リスナを削除
-    this.$store.state.skyway.peer.removeAllListeners('call');
+    if (this.$store.state.skyway.peer != null) this.$store.state.skyway.peer.removeAllListeners('call');
     this.call = null;
   },
 
