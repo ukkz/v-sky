@@ -26,10 +26,10 @@
               @click="audio_muted = !audio_muted">
               <v-icon>mdi-microphone{{ (audio_muted ? '-off' : '') }}</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : '音声' }}</v-btn>
             <v-btn outlined small class="ma-1" color="indigo darken-4"
-              @click.stop="config_dialog_open = true">
+              @click.stop="config_dialog_open = true" v-if="!$store.state.config.onestep_mode">
               <v-icon>mdi-cog</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : '設定' }}</v-btn>
             <v-btn outlined small class="ma-1" color="pink darken-1"
-              @click="logout">
+              @click="logout" v-if="!$store.state.config.onestep_mode">
               <v-icon>mdi-exit-run</v-icon>{{ ($vuetify.breakpoint.xs) ? '' : 'ログアウト' }}</v-btn>
           </v-row>
         </v-col>
@@ -54,14 +54,21 @@
 
         <v-divider></v-divider>
 
-        <v-card-text class="mt-2">
+        <!-- 1stepモード時 -->
+        <v-card-text class="mt-2" v-if="$store.state.config.onestep_mode">
+          以下に、正常に映像が表示されているかご確認ください。<br>
+          問題がなければ右上の×ボタンを押してこのダイアログを閉じ、相手から着信があるまでそのままお待ちください。
+        </v-card-text>
+
+        <!-- 通常モード時 -->
+        <v-card-text class="mt-2" v-if="!$store.state.config.onestep_mode">
           利用したいカメラ・マイクを選択してください。<br>
           使用可否を求めるダイアログが表示された場合は「許可」をクリックしてください。
         </v-card-text>
 
         <v-row justify="center" dense class="mx-1">
 
-          <v-col cols="6">
+          <v-col cols="6" v-if="!$store.state.config.onestep_mode">
             <v-select v-model="selectedVideo" :items="video_devices" label="映像入力" @change="onChangeLocalDevice" class="mt-2"></v-select>
             <v-select v-model="selectedAudio" :items="audio_devices" label="音声入力" @change="onChangeLocalDevice" class="mt-n2"></v-select>
             <v-switch v-model="qr_onoff"      :label="`QR認識：${(!qr_available)?'利用不可':(qr_onoff)?'有効':'無効'}`" :disabled="!qr_available" class="mt-n2"></v-switch>
@@ -143,6 +150,7 @@ export default {
       selectedAudio: '',
       selectedVideo: '',
       local_media_stream: (new MediaStream()), // 直接変更禁止
+      miclevel_animation_id: null,
       miclevel_abort_flag: false, // 直接変更禁止
       speech_available: false,
       qr_available: false,
@@ -173,6 +181,8 @@ export default {
     this.$store.dispatch('connectSkyWay');
     // ページセッションが2回目以降（used_deviceのキーがaudioもvideoもストレージ内に存在する）ならダイアログを開かない
     this.config_dialog_open = (sessionStorage.getItem('used_audio_device') && sessionStorage.getItem('used_video_device')) ? false : true;
+    // 1stepモードのときはログイン時に常に開く
+    if (this.$store.state.config.onestep_mode) this.config_dialog_open = true;
   },
 
   mounted: async function() {
@@ -267,7 +277,7 @@ export default {
         }
       } finally {
         // 波形表示を開始（または再開）
-        this.drawMicLevel(this.local_media_stream, (this.config_dialog_open) ? 'miclevel-dialog' : 'miclevel-dashboard', 15);
+        this.$nextTick(() => this.startMicLevelAnimation((this.config_dialog_open) ? 'miclevel-dialog' : 'miclevel-dashboard'));
       }
     },
 
@@ -295,14 +305,14 @@ export default {
     },
 
     // マイク入力波形描画
-    drawMicLevel: function(stream, canvas_id, fps = 30) {
-      // 以前の関数ループを止めるため一度abortフラグを立てる
-      this.miclevel_abort_flag = true;
+    startMicLevelAnimation: function(canvas_id) {
+      // すでに開始している描画があれば止める
+      if (this.miclevel_animation_id) cancelAnimationFrame(this.miclevel_animation_id);
       // 音声ストリームが存在しない場合は描画しない
-      if (!stream || stream.getAudioTracks().length == 0) return;
-      //
+      if (!this.local_media_stream || this.local_media_stream.getAudioTracks().length == 0) return;
+      // 入力ソースとアナライザの準備
       const audioctx = new (window.AudioContext || window.webkitAudioContext)();
-      const input = audioctx.createMediaStreamSource(stream);
+      const input = audioctx.createMediaStreamSource(this.local_media_stream);
       const analyser = audioctx.createAnalyser();
       // AudioNode(input) -> AnalyserNode(analyser) -> AudioDestinationNode(audioctx)
       input.connect(analyser);
@@ -315,6 +325,7 @@ export default {
       const dataArray = new Uint8Array(bufferLength);
       // 波形表示対象のキャンバス
       const canvas = document.getElementById(canvas_id);
+      if (!canvas) return; // 1stepですぐ退室する場合は描画不要のため呼ばれてもすぐに戻す
       const parent = canvas.parentNode;
       const canvas_width = parent.offsetWidth;
       const canvas_height = 100; // 実際の表示はCSSで親要素100%高に引き延ばされる
@@ -326,13 +337,10 @@ export default {
       // 描画処理
       let prev_level = 0;
       // ループ内変数
-      let begin_time, current_level, avg_level, bar_width;
+      let current_level, avg_level, bar_width;
 
       const draw = () => {
         // ---- 処理開始 ----
-        begin_time = Date.now();
-        // 一時的に抜けるときに使う
-        if (this.miclevel_abort_flag) return;
         // データ取得
         analyser.getByteTimeDomainData(dataArray);
         // キャンバスクリア
@@ -350,16 +358,10 @@ export default {
         ctx.fillStyle = 'rgba(200, 20, 20, 0.7)';
         ctx.fillRect(0, (1 - avg_level) * canvas_height, bar_width, avg_level * canvas_height);
         // ---- 処理ここまで ----
-        // fpsにあわせて次回の描画タイミングをセット
-        setTimeout(draw, (1000/fps - (Date.now() - begin_time)));
+        this.miclevel_animation_id = requestAnimationFrame(draw);
       }
-
-      // 描画開始
-      this.$nextTick(() => {
-        // ループ処理を続行させる
-        this.miclevel_abort_flag = false;
-        draw();
-      });
+      // 描画開始（初回）
+      draw();
     },
 
     // カメラ・マイクそれぞれのPermissionがgrantedかどうか
@@ -385,7 +387,13 @@ export default {
       // store/index.jsのactionsでLINEログアウト処理などを行ったのち状態変数をログアウトに
       this.$store.dispatch('logout');
       // ログインページ
-      this.$router.push({ path: '/login' });
+      if (this.$store.state.config.onestep_mode) {
+        // 1stepモード
+        this.$router.push({ path: '/login', query: { '1step': null } });
+      } else {
+        // 通常モード
+        this.$router.push({ path: '/login' });
+      }
     },
   },
 
@@ -431,9 +439,9 @@ export default {
 
   watch: {
     // 設定ダイアログの開閉
-    config_dialog_open: function(newstate, oldstate) {
+    config_dialog_open: function(state) {
       // 現在表示しているほう（ダッシュボードまたはダイアログ）でレベルメータを再表示
-      this.$nextTick(() => this.drawMicLevel(this.local_media_stream, (newstate) ? 'miclevel-dialog' : 'miclevel-dashboard', 15));
+      this.$nextTick(() => this.startMicLevelAnimation((state) ? 'miclevel-dialog' : 'miclevel-dashboard'));
     },
   },
 }
@@ -449,6 +457,7 @@ div#vf-dashboard {
 div#vf-dialog {
   width: 100%;
   height: 100%;
+  min-height: 20vh;
   border-radius: 20px;
 }
 div.vf {

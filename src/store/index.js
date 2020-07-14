@@ -26,6 +26,7 @@ export default new Vuex.Store({
     client_payload_buffer: null,
     // グローバルな設定変数
     config: {
+      onestep_mode: true,
       debug: false,
       video_muted: false,
       audio_muted: false,
@@ -130,6 +131,7 @@ export default new Vuex.Store({
     _payload_copy_to_buffer(state, payload) { Vue.set(state, 'client_payload_buffer', payload) },
 
     // その他の設定変更
+    oneStepMode(state, onoff) { state.config.onestep_mode = onoff },
     videoMute(state, onoff) { state.config.video_muted = onoff },
     audioMute(state, onoff) { state.config.audio_muted = onoff },
     speechConfig(state, onoff) { state.config.speech_recognition = onoff },

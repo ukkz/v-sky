@@ -57,6 +57,18 @@ export default {
     RoomList,
   },
 
+  mounted() {
+    // 1stepモードではこのDashboardを表示させないのでアクセスがあった場合はログアウトさせる
+    if (this.$store.state.config.onestep_mode) {
+      // セッションストレージ変数削除
+      sessionStorage.clear();
+      // store/index.jsのactionsでLINEログアウト処理などを行ったのち状態変数をログアウトに
+      this.$store.dispatch('logout');
+      // ログインページ（1stepモード用パラメータ付き）
+      this.$router.push({ path: '/login', query: { '1step': null } });
+    }
+  },
+
   methods: {
     // 部屋への参加
     // meObjectRoom = { name: 部屋名, type: meshかsfu, public: trueかfalse }
